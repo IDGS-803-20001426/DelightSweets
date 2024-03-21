@@ -1,0 +1,1 @@
+"# practica_bd_idgs803"  initgit add README.mdgit commit -m "first commit"git branch -M maingit remote add origin https://github.com/IDGS-803-20001430/practica_bd_idgs803.gitgit push -u origin main
