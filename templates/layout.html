@@ -4,45 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous"> -->
-    <link rel="stylesheet" href="../static/bootstrap/css/bootstrap.min.css">
-
-    <style>
-        body{
-            padding-top: 0px;
-        }
-
-        .tr-head{
-            background: #dff0d8;
-        }
-    </style>
-
-    <link rel="stylesheet" href="../static/bootstrap/css/bootstrap-responsive.min.css">
+    
+    <link rel="stylesheet" href="../static/libraries/bootstrap-5.3.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../static/libraries/sweetalert/sweetalert.min.css">
+    <link rel="stylesheet" href="../static/libraries/datatables-2.0.2/datatables.min.css">
+    <link rel="stylesheet" href="../static/libraries/animatecss-4.1.1/animate.min.css">
 </head>
 <body>
-    <div class="navbar navbar-inverse navbar-flxed-top">
-        <div class="navbar-inner">
-            <div class="container">
-                <a class="brand" href="">
-                    IDGS-803
-                </a>
-                <ul class="nav">
-                    <li class="active">
-                        <a href="">
-                            <i class="icon-home icon-white"></i>
-                            Inicio
-                        </a>
-                    </li>
-                    <li>
-                        <a href="">
-                            <i class="icon-user icon-white"></i>
-                            Alumnos
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
 
     <div class="container">
         {%with messages = get_flashed_messages()%}
@@ -57,40 +25,11 @@
 
     </div>
 
-    <div class="container">
-        <div class="row">
-            <!-- <h1>Escuela {{escuela}}</h1>
-
-            {% for nom in alumnos %}
-                <h2>{{nom}}</h2>
-            {% endfor %}
-        
-            <table>
-                <tr>
-                    <td>Dato Prueba</td>
-                    <td>Dato Prueba</td>
-                    <td>Dato Prueba</td>
-                </tr>
-                <tr>
-                    <td>1</td>
-                    <td>2</td>
-                    <td>3</td>
-                </tr>
-                <tr>
-                    <td>4</td>
-                    <td>5</td>
-                    <td>6</td>
-                </tr>
-            </table> -->
-
-            {%block content%}
-
-            {%endblock%}
-
-        </div>
-    </div>
-
-    
+    <script src="../static/libraries/bootstrap-5.3.3/js/bootstrap.bundle.js"></script>
+    <script src="../static/libraries/jquery-3.1.1/jquery.js"></script>
+    <script src="../static/libraries/sweetalert/sweetalert.min.js"></script>
+    <script src="../static/libraries/datatables-2.0.2/datatables.min.js"></script>
+    <script src="../static/libraries/fontawesome/fontawesome.js"></script>
 
 </body>
 </html>
