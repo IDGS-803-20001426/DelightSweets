@@ -1,6 +1,6 @@
 # Crear Base de Datos 
-- proyectGalleta
-    - CREATE DATABASE proyectGalleta;
+- proyectoGalleta
+    - CREATE DATABASE proyectoGalleta;
 # Crear Usuario diferente al root
 - Crear un usuario
     - CREATE USER 'donGalleta'@'localhost' IDENTIFIED WITH mysql_native_password BY 'proyecto';
