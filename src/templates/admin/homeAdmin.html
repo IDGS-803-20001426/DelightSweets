@@ -1,0 +1,11 @@
+{% extends 'admin/base.html' %}
+{% block title %}HomeAdmin{% endblock %}
+
+{% block body %}
+
+{{ super() }}
+
+<h1>Bienvenido Administrador, {{ current_user.fullname }}</h1>
+<a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
+
+{% endblock %}
