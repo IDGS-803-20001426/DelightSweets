@@ -47,8 +47,8 @@ class UserView(MyModelView):
 
     def on_model_change(self, form, model, is_created):
         # Generate password hash before saving the user
-        if 'contrasenia' in form.contrasenia.data:
-            model.contrasenia = generate_password_hash(form.contrasenia.data)
+        if 'contrasenia' in form.data and form.data['contrasenia']:
+            model.contrasenia = generate_password_hash(form.data['contrasenia'])
   
 
     
