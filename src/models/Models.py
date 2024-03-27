@@ -19,3 +19,17 @@ class User(db.Model,UserMixin):
     @classmethod
     def check_password(self, hashed_password, password):
         return check_password_hash(hashed_password, password)
+    
+class Galleta(db.Model):
+    __tablename__ = 'galleta'
+
+    id_galleta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    porcentaje_ganacia = db.Column(db.Float, nullable=False)
+    imagen = db.Column(db.Text)
+
+    def __init__(self, nombre, porcentaje_ganacia, imagen=None):
+        self.nombre = nombre
+        self.porcentaje_ganacia = porcentaje_ganacia
+        self.imagen = imagen
+    

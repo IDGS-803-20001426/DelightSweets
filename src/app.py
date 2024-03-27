@@ -106,6 +106,9 @@ def home():
 def homeAdmin():
     return render_template('admin/homeAdmin.html')
 
+@app.route('/ventas')
+def ventas():
+    return render_template('ventas/ventas.html')
 
 @app.route('/protected')
 @login_required
