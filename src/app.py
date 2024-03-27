@@ -9,9 +9,10 @@ from werkzeug.security import generate_password_hash
 
 
 # Models:
-from models.Models import User,db,Rol
+from models.Models import User,db,Rol,Galleta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
+from models.galletaDao import GalletaDAO
 from config import DevelopmentConfig
 
 
@@ -101,7 +102,10 @@ def home():
 
 @app.route('/ventas')
 def ventas():
-    return render_template('ventas/ventas.html')
+    galletas = GalletaDAO.get_all()
+    for galleta in galletas:
+        print(f"ID: {galleta.id_galleta}, Nombre: {galleta.nombre}, Porcentaje de ganancia: {galleta.porcentaje_ganacia}, Imagen: {galleta.imagen}")
+    return render_template('ventas/ventas.html', galletas=galletas)
 
 @app.route('/protected')
 @login_required

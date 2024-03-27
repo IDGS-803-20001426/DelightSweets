@@ -7,12 +7,27 @@
 
 {% block body %}
 <div class="container row">
-    <div class="col-lg-8">
+    <div class="col-sm-6 col-lg-8">
         <div class="productos">
-            <p>aqui van los productos</p>
+            <div class="row">
+                {% for galleta in galletas %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="galletas">
+                        <div class="imagen_galleta">
+                            {{ galleta.imagen }}
+                             <img src="data:image/jpeg;base64,{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
+                        </div>
+                        <div class="info_galleta">
+                            <p>ID: {{ galleta.id_galleta }}</p>
+                            <p>Nombre: {{ galleta.nombre }}</p>    
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}        
+            </div>
         </div>
     </div>
-    <div class="col-lg-4">
+    <div class="col-sm-6 col-lg-4">
         <div class="ventas">
             <p>aqui van las ventas</p>
         </div>
