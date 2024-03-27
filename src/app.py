@@ -118,6 +118,35 @@ def status_404(error):
     return render_template('errores/404.html'),404
 #----------------------------------------------------------------
 
+#Compras---------------------------------------------------------
+@app.route('/compras')
+def mostrar_pagina_compras():
+    return render_template('compras.html')
+
+
+# Ruta para manejar el registro de compras
+@app.route('/registrar_compra', methods=['POST'])
+def registrar_compra():
+    if request.method == 'POST':
+        nombre_producto = request.form['nombre_producto']
+        cantidad = int(request.form['cantidad'])
+        precio_compra = float(request.form['precio_compra'])
+        fecha_compra = datetime.strptime(request.form['fecha_compra'], '%Y-%m-%d').date()
+        fecha_caducidad = datetime.strptime(request.form['fecha_caducidad'], '%Y-%m-%d').date()
+        nombre_proveedor = request.form['nombre_proveedor']
+
+        nueva_compra = Compra(nombre_producto=nombre_producto, cantidad=cantidad, precio_compra=precio_compra,
+                              fecha_compra=fecha_compra, fecha_caducidad=fecha_caducidad,
+                              nombre_proveedor=nombre_proveedor)
+
+        try:
+            db.session.add(nueva_compra)
+            db.session.commit()
+            return redirect(url_for('mostrar_formulario_compra'))
+        except:
+            return 'Hubo un problema al agregar la compra'
+
+            
 if __name__ == '__main__':
     csrf.init_app(app)
     db.init_app(app)

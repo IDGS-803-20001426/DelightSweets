@@ -26,3 +26,16 @@ class Rol(db.Model):
     
     id_rol = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
     nombre = db.Column(db.String(100), nullable=False)
+
+
+    
+class Compra(db.Model):
+    __tablename__ = 'compras'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre_producto = db.Column(db.String(100), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_compra = db.Column(db.Float, nullable=False)
+    fecha_compra = db.Column(db.Date, nullable=False)
+    fecha_caducidad = db.Column(db.Date, nullable=False)
+    nombre_proveedor = db.Column(db.String(200), nullable=False)
