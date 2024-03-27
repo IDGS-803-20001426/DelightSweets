@@ -5,10 +5,14 @@ class UserDAO:
     @classmethod
     def login(cls, user):
         try:
-            username = user.username
-            password = user.password
-            user_from_db = User.query.filter_by(username=username).first()
-            if user_from_db and User.check_password(user_from_db.password, password):
+
+            username = user.nombre_usuario
+            password = user.contrasenia
+            print(username)
+            print(password)
+            
+            user_from_db = User.query.filter_by(nombre_usuario=username).first()
+            if user_from_db and User.check_password(user_from_db.contrasenia, password):
                 return user_from_db
             else:
                 return None
@@ -16,8 +20,8 @@ class UserDAO:
             raise Exception(ex)
 
     @classmethod
-    def get_by_id(cls, user_id):
+    def get_by_id(cls, id_usuario):
         try:
-            return User.query.get(user_id)
+            return User.query.get(id_usuario)
         except Exception as ex:
             raise Exception(ex)

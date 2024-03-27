@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 
 
 # Models:
-from models.Models import User,db
+from models.Models import User,db,Rol
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from config import DevelopmentConfig
@@ -23,44 +23,38 @@ login_manager_app = LoginManager(app)
 
 
 @login_manager_app.user_loader
-def load_user(user_id):
-    return UserDAO.get_by_id(user_id)
+def load_user(id_usuario):
+    return UserDAO.get_by_id(id_usuario)
 
-class CustomView(BaseView):
-    @expose('/')
-    def index(self):
-        if current_user.is_authenticated:
-            return self.render('admin/custom_index.html')
-        else:
-            return "Unauthorized", 403
 
 class MyModelView(ModelView):
+    list_template = 'admin/list.html'
+    base_template = 'layoutMaster.html'
     def is_accessible(self):
         return current_user.is_authenticated
         
-# admin = Admin(app)
-# admin.add_view(CustomView(name='Custom View', endpoint='custom'))
-# admin = Admin(app, template_mode='bootstrap3')
-# admin = Admin(app, index_view=AdminIndexView())
 admin = Admin(
     app,
-    name='My Dashboard',  # Nombre personalizado para el panel de administración
+    name='Panel Administrador',  # Nombre personalizado para el panel de administración
     base_template='layoutMaster.html',  # Plantilla base personalizada
-    template_mode='bootstrap4'  # Modo de plantilla (en este caso, Bootstrap 5)
+    template_mode='bootstrap3'  # Modo de plantilla (en este caso, Bootstrap 5)
 )
 
 
 class UserView(MyModelView):
-    column_exclude_list = ('password',)  # Exclude password from the list view
-    form_excluded_columns = ('password',)  # Exclude password from the edit/create form
+    column_exclude_list = ('contrasenia')  # Exclude password from the list view
+    form_excluded_columns = ()  # Exclude password from the edit/create form
 
     def on_model_change(self, form, model, is_created):
         # Generate password hash before saving the user
-        if 'password' in form.password.data:
-            model.password = generate_password_hash(form.password.data)
+        if 'contrasenia' in form.data and form.data['contrasenia']:
+            model.contrasenia = generate_password_hash(form.data['contrasenia'])
+  
 
-# Add views to admin
-admin.add_view(UserView(User, db.session,name="usuarios"))
+    
+# # Add views to admin
+admin.add_view(UserView(User,db.session,name="usuarios"))
+
 
 @app.route('/admin')
 @login_required  # Asegura que solo los usuarios autenticados puedan acceder
@@ -86,12 +80,9 @@ def login():
 
 def validarInicioSesion(logged_user):
     if logged_user != None:
-        if logged_user.password:
+        if logged_user.contrasenia:
             login_user(logged_user)
-            if logged_user.tipoUsuario == 1:  
-                return redirect(url_for('homeAdmin'))  
-            else:
-                return redirect(url_for('home'))
+            return redirect(url_for('home'))
         else:
             flash("Invalid password...")
             return render_template('auth/login.html')
@@ -101,10 +92,12 @@ def validarInicioSesion(logged_user):
 
 @app.route('/home')
 def home():
-    return render_template('home.html')
-@app.route('/homeAdmin')
-def homeAdmin():
-    return render_template('admin/homeAdmin.html')
+    print("tipo Usuario {} ".format(current_user.rol))
+    if current_user.rol == 1:  
+        return redirect('/admin')
+    else:
+        return render_template('home.html')
+
 
 @app.route('/ventas')
 def ventas():

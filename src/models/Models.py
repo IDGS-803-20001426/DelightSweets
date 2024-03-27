@@ -5,21 +5,28 @@ import datetime
 
 db = SQLAlchemy()
 
-class User(db.Model,UserMixin):
-    __tablename__ = 'users'
+class User(db.Model, UserMixin):
+    __tablename__ = 'usuario'  # Nombre de la tabla en la base de datos
 
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100))
-    password = db.Column(db.String(200))
-    fullname = db.Column(db.String(100))
-    tipoUsuario = db.Column(db.Integer)
-    statusUsuario = db.Column(db.Integer)
-    create_date = db.Column(db.DateTime, default=datetime.datetime.now)
+    id_usuario = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    nombre_usuario = db.Column(db.String(100), nullable=False, unique=True)
+    contrasenia = db.Column(db.String(500), nullable=False)
+    rol = db.Column(db.SmallInteger, nullable=False)
+    nombre_completo = db.Column(db.String(100), nullable=False)
+    fecha_password = db.Column(db.DateTime, default=datetime.datetime.now)
+    def get_id(self):
+        return str(self.id_usuario)
 
     @classmethod
-    def check_password(self, hashed_password, password):
-        return check_password_hash(hashed_password, password)
+    def check_password(self, hashed_password, contrasenia):
+        return check_password_hash(hashed_password, contrasenia)
+
+class Rol(db.Model):
+    __tablename__ = 'rol'
     
+    id_rol = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    nombre = db.Column(db.String(100), nullable=False)
+
 class Galleta(db.Model):
     __tablename__ = 'galleta'
 
@@ -32,4 +39,3 @@ class Galleta(db.Model):
         self.nombre = nombre
         self.porcentaje_ganacia = porcentaje_ganacia
         self.imagen = imagen
-    

@@ -1,8 +1,18 @@
-{% extends 'admin/master.html' %}
+{% extends 'admin/base.html' %}
+
+
+<!-- CONFIGURACIÓN DE OPCIONES MENU -->
+{% block menu_links %}
+<div style="justify-content: right;">
+    <a class="btn btn-primary" href="{{ url_for('logout') }}" style="margin-top:10px;">Logout</a> 
+</div>
+{% endblock %}
+
+<!-- CONFIGURACIÓN DE TITULO -->
+{% block title %}Home{% endblock %}
+
+<!-- CONFIGURACIÓN DE BODY -->
 {% block body %}
-
-
-
-<h1>Bienvenido FLASK-ADMIN</h1>
-
+<h1>Bienvenido administrador, {{ current_user.fullname }}</h1>
+<a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
 {% endblock %}
