@@ -4,7 +4,6 @@
 {% block customCSS %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ventas.css') }}">
 {% endblock %}
-
 {% block body %}
 <div class="container row">
     <div class="col-sm-6 col-lg-8">
@@ -14,12 +13,59 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="galletas">
                         <div class="imagen_galleta">
-                            {{ galleta.imagen }}
-                             <img src="data:image/jpeg;base64,{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
+                            <img src="{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
                         </div>
                         <div class="info_galleta">
-                            <p>ID: {{ galleta.id_galleta }}</p>
-                            <p>Nombre: {{ galleta.nombre }}</p>    
+                            <!-- <p>ID: {{ galleta.id_galleta }}</p> -->
+                            <p>{{ galleta.nombre }}</p>  
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" type="button"   data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ galleta.id_galleta }}">AGREGAR</button>
+                            </div>
+                            <!-- MODAL -->
+                            <div class="modal fade" id="staticBackdrop{{ galleta.id_galleta }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="staticBackdropLabel"> ¿Cómo quieres tu {{ galleta.nombre }}?</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row">
+                                            <!-- FORMULARIO DE GRAMOS / PIEZAS -->
+                                            <div class="col-sm-6">
+                                                <form id="form_{{ galleta.id_galleta }}">
+                                                    <div class="mb-3">
+                                                        <label for="medida_{{ galleta.id_galleta }}" class="form-label">Selecciona la medida:</label>
+                                                        <select class="form-select" id="medida_{{ galleta.id_galleta }}" onchange="showInputAndButton(this)">
+                                                            <option value="">Selecciona una medida</option>
+                                                            <option value="gramos">Gramos</option>
+                                                            <option value="piezas">Piezas</option>
+                                                        </select>
+                                                    </div>
+                                                    <div id="cantidad_button_{{ galleta.id_galleta }}" class="mb-3" style="display: none;">
+                                                        <label for="cantidad_{{ galleta.id_galleta }}" class="form-label">Cantidad:</label>
+                                                        <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="validateInput(this)">
+                                                        <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}')">Añadir</button>
+                                                    </div>
+                                                </form>
+                                            </div>    
+                                            <!-- FORMULARIO DE GRAMOS / PIEZAS -->                                        
+                                            <div class="col-sm-6">
+                                                <div id="cantidades-container">
+                                                    <p id="mensaje-vacio">Añade tus galletas</p>
+                                                </div>
+                                            </div>                                            
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">Cancelar Orden</button>
+                                        <button type="button" class="btn btn-primary">Confirmar Orden</button>
+                                        <button type="button" class="btn btn-secondary" onclick="confirmarCancelar('{{ galleta.id_galleta }}')">Eliminar Pedido</button>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- MODAL -->
                         </div>
                     </div>
                 </div>
@@ -33,4 +79,7 @@
         </div>
     </div>
 </div>
+{% block customJS %}
+<script src="{{ url_for('static', filename='js/ventas.js') }}"></script>
+{% endblock %}
 {% endblock %}

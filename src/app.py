@@ -103,8 +103,8 @@ def home():
 @app.route('/ventas')
 def ventas():
     galletas = GalletaDAO.get_all()
-    for galleta in galletas:
-        print(f"ID: {galleta.id_galleta}, Nombre: {galleta.nombre}, Porcentaje de ganancia: {galleta.porcentaje_ganacia}, Imagen: {galleta.imagen}")
+    # for galleta in galletas:
+    #     print(f"ID: {galleta.id_galleta}, Nombre: {galleta.nombre}, Porcentaje de ganancia: {galleta.porcentaje_ganacia}, Imagen: {galleta.imagen}")
     return render_template('ventas/ventas.html', galletas=galletas)
 
 @app.route('/protected')
