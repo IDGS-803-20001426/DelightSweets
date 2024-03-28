@@ -6,12 +6,18 @@ from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.base import BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from werkzeug.security import generate_password_hash
+from flask_admin.form import Select2Widget
+from wtforms import SelectField, IntegerField, FloatField, DateField, DateTimeField, DateTimeLocalField
+from wtforms.validators import DataRequired
+from wtforms_sqlalchemy.fields import QuerySelectField
+from flask_wtf import FlaskForm
 
 
 # Models:
-from models.Models import User,db,Rol
+from models.Models import User,db,Rol, SolicitudProduccion, Receta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
+from models.recetaDao import RecetaDAO
 from config import DevelopmentConfig
 
 
@@ -55,6 +61,58 @@ class UserView(MyModelView):
 # # Add views to admin
 admin.add_view(UserView(User,db.session,name="usuarios"))
 
+class SolicitudProduccionForm(FlaskForm):
+    id_receta = SelectField('Receta', choices=[], validators=[DataRequired()], coerce=int)
+    fecha_solicitud = DateTimeLocalField('Fecha de Solicitud', format='%Y-%m-%dT%H:%M')
+
+class SolicitudProduccionView(ModelView):
+    form = SolicitudProduccionForm
+    column_formatters = {
+        'id_receta': lambda v, c, m, p: m.receta.nombre_receta if m.receta else "Receta Desconocida"
+    }
+    column_labels = {
+        'id_receta': 'Receta',
+        'fecha_solicitud': 'Fecha de Solicitud',
+    }
+    column_list = ('id_receta', 'fecha_solicitud', 'fecha_terminacion', 'estatus')
+
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    def on_form_prefill(self, form, id):
+        form.id_receta.choices = [(receta.id_receta, receta.nombre_receta) for receta in Receta.query.all()]
+
+    def create_form(self, obj=None):
+        form = super().create_form(obj)
+        form.id_receta.choices = [(receta.id_receta, receta.nombre_receta) for receta in Receta.query.all()]
+        return form
+    
+    def edit_form(self, obj):
+        form = super().edit_form(obj)
+        form.id_receta.choices = [(receta.id_receta, receta.nombre_receta) for receta in Receta.query.all()]
+        return form
+
+    def on_model_change(self, form, model, is_created):
+        id_receta = form.id_receta.data
+        model.id_receta = id_receta
+        model.fecha_solicitud = form.fecha_solicitud.data
+        model.id_usuario = current_user.id_usuario
+        model.estatus = 'Solicitada'
+
+admin.add_view(SolicitudProduccionView(SolicitudProduccion, db.session, name="Solicitud Producción"))
+
+def sanitizarDatos(inputString):
+    caracteresNoAceptados = ["select", "insert", "update", "delete", "drop", 
+                             "SELECT","INSERT","UPDATE","DELETE","DROP",
+                             "Select","Insert","Update","Delete","Drop",
+                             "<", ">", ";", "'", '"', "*" ]
+
+    # Reemplaza cada palabra prohibida con una cadena vacía
+    cadenaSanitizadda = inputString
+    for palabra in caracteresNoAceptados:
+        cadenaSanitizadda = cadenaSanitizadda.replace(palabra, '')
+
+    return cadenaSanitizadda
 
 @app.route('/admin')
 @login_required  # Asegura que solo los usuarios autenticados puedan acceder
