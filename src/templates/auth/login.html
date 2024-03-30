@@ -33,4 +33,68 @@
     </div>
     <button class="w-100 btn btn-lg btn-primary" type="submit">Iniciar Sesión</button>
 </form>
+
+
+{% if abrir_modal %}
+    <script src="../../static/libraries/jquery-3.1.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#modalCambiarContraseña').modal('show');
+            
+            // Controlador de eventos para el envío del formulario de cambio de contraseña
+            $('#formCambiarContraseña').submit(function(event) {
+                event.preventDefault();                
+                var formData = $(this).serialize();
+                
+                $.ajax({
+                    url: '/actualizarContrasenia',
+                    type: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        console.log(response); 
+                        if (response.exito === 'ok') {
+                            $('#modalCambiarContraseña').modal('hide');
+                            console.log("Contraseña actualizada con éxito.");
+                            window.location.href = "http://127.0.0.1:5000/login";
+                        } else if (response.errors) {
+                            $('#error-messages').empty(); 
+                            response.errors.forEach(function(error) {
+                                $('#error-messages').append('<div>' + error + '</div>');
+                            });
+                        }
+                            
+                    },
+                    error: function(xhr, status, error) {
+                        console.error(xhr.responseText);
+                    }
+                });
+            });
+        });
+    </script>
+
+{% endif %}
+<!-- MODAL PARA CAMBIAR CONTRASEÑA SI EXCEDE DE LOS TRES MESES -->
+<div class="modal fade" id="modalCambiarContraseña" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title" id="exampleModalLabel">Change Password</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCambiarContraseña" method="post" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="nueva-contrasenia" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="nueva-contrasenia" name="nueva_contrasenia">
+                        <div id="error-messages" class="text-danger"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 {% endblock %}

@@ -1,6 +1,5 @@
 {% extends 'admin/base.html' %}
 
-
 <!-- CONFIGURACIÓN DE OPCIONES MENU -->
 {% block menu_links %}
 <div style="justify-content: right;">
@@ -13,6 +12,20 @@
 
 <!-- CONFIGURACIÓN DE BODY -->
 {% block body %}
-<h1>Bienvenido administrador, {{ current_user.fullname }}</h1>
-<a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
+
+    {% if current_user %}
+        {% if current_user.rol == 1 %}
+            <h1>Bienvenido Administrador, {{ current_user.nombre_completo|title }}</h1>
+        {% elif current_user.rol == 2 %}
+            <h1>Bienvenido Cocinero, {{ current_user.nombre_completo|title }}</h1>
+        {% elif current_user.rol == 3 %}
+            <h1>Bienvenido Vendedor, {{ current_user.nombre_completo|title }}</h1>
+        {% endif %}
+        <h3>Tu último inicio de sesión registrado fue: {{ current_user.ultimaSesion|title }}</h3>
+        <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
+
+    {% else %}
+        {% include 'errores/401.html' %}
+    {% endif %}
+
 {% endblock %}

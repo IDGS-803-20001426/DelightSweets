@@ -1,0 +1,22 @@
+
+{% block body %}
+<h1>Usuarios y permisos</h1>
+<table>
+  <thead>
+    <tr>
+      <th>Usuario</th>
+      <th>Rol</th>
+      <th>Permisos</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in data %}
+    <tr>
+      <td>{{ item.nombre_usuario }}</td>
+      <td>{{ item.rol }}</td>
+      <td>{{ item.permiso }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

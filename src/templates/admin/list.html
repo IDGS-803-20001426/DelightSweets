@@ -2,7 +2,7 @@
 {% import 'admin/model/layout.html' as model_layout with context %}
 
 {% block brand %}
-    <h2 id="brand">{{ admin_view.name|capitalize }} Existentes</h2>
+    <h2 id="brand">{{ admin_view.name|capitalize }} </h2>
     {% if admin_view.can_create %}
     <div class="btn-menu">
       <a href="{{ url_for('.create_view', url=return_url) }}" class="btn btn-primary pull-right">{{ _gettext('Create') }}</a>
