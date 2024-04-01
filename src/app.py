@@ -798,7 +798,7 @@ def produccion():
         datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
         numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
         #Insertar inventario_producto_terminado
-        ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas)
+        ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
         if estatus == 1:
             actualizarInventario(db, datosReceta.id_receta)
         

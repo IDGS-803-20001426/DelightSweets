@@ -39,13 +39,14 @@ class ProduccionDAO:
             db.session.rollback()
             return False
         
-    def insertarRegistroInventarioProductoTerminado(db, id_galleta, cantidad):
+    def insertarRegistroInventarioProductoTerminado(db, id_galleta, cantidad,estatus):
         try:
             # Crear una nueva instancia de InventarioProductoTerminado con los valores proporcionados
             nuevo_registro = InventarioProductoTerminado(
                 id_galleta=id_galleta,
                 fecha_produccion=datetime.now(),  # Obtener la fecha y hora actual
-                cantidad=cantidad
+                cantidad=cantidad,
+                estatus=estatus
             )
             # Agregar el nuevo registro a la sesión y confirmar los cambios
             db.session.add(nuevo_registro)
