@@ -77,13 +77,10 @@
         <ul class="nav flex-column text-white w-100">
             <img class="mb-2" src="{{ url_for('static', filename='img/logo1.png') }}" alt="" width="170" height="170">
             
-            <li href="#" class="nav-link" id="opcionesMenu">
-                <i class="bi bi-house-door-fill"></i>
-                <span class="mx-2">Home</span>
-            </li>
-            <li href="#" class="nav-link" id="opcionesMenu">
-                <i class="bi bi-people-fill"></i>
-                <span class="mx-2">Usuarios</span>
+            <li class="nav-link" id="opcionesMenu">
+                <span class="mx-2">
+                    <a href="/admin/">Home</a>
+                </span>
             </li>
         </ul>
     </div>
