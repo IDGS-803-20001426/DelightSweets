@@ -39,3 +39,44 @@ class Galleta(db.Model):
         self.nombre = nombre
         self.porcentaje_ganacia = porcentaje_ganacia
         self.imagen = imagen
+
+class MateriaPrima(db.Model):
+    __tablename__ = 'materia_prima'
+
+    id_materia = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    costo = db.Column(db.Float, nullable=True)
+
+    def __init__(self, nombre, costo=None):
+        self.nombre = nombre
+        self.costo = costo
+
+class Receta(db.Model):
+    __tablename__ = 'receta'
+
+    id_receta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    nombre_receta = db.Column(db.String(100), nullable=False)
+    id_galleta = db.Column(db.SmallInteger, db.ForeignKey('galleta.id_galleta'), nullable=False)
+
+    galleta = db.relationship('Galleta', backref=db.backref('recetas', lazy=True))
+
+class RecetaMateriaIntermedia(db.Model):
+    __tablename__ = 'receta_materia_intermedia'
+
+    id_receta_producto_terminado = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_receta = db.Column(db.SmallInteger, db.ForeignKey('receta.id_receta'), nullable=False)
+    id_materia = db.Column(db.SmallInteger, db.ForeignKey('materia_prima.id_materia'), nullable=False)
+    cantidad = db.Column(db.Float, nullable=True)
+
+    receta = db.relationship('Receta', backref=db.backref('materias_intermedias', lazy=True))
+    materia_prima = db.relationship('MateriaPrima', backref=db.backref('recetas_intermedias', lazy=True))
+
+class Equivalencia(db.Model):
+    __tablename__ = 'equivalencia'
+
+    id_equivalencia = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_receta = db.Column(db.SmallInteger, db.ForeignKey('receta.id_receta'), nullable=False)
+    piezas = db.Column(db.Integer, nullable=False)
+    gramaje = db.Column(db.Float, nullable=False)
+
+    receta = db.relationship('Receta', backref=db.backref('equivalencias', lazy=True))

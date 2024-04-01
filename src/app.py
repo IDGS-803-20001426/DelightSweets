@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 from flask_mysqldb import MySQL
 from flask_login import LoginManager, login_user, logout_user, login_required,current_user
@@ -100,12 +100,33 @@ def home():
         return render_template('home.html')
 
 
-@app.route('/ventas')
+from flask import jsonify
+
+@app.route('/ventas', methods=["GET", "POST"])
 def ventas():
-    galletas = GalletaDAO.get_all()
-    # for galleta in galletas:
-    #     print(f"ID: {galleta.id_galleta}, Nombre: {galleta.nombre}, Porcentaje de ganancia: {galleta.porcentaje_ganacia}, Imagen: {galleta.imagen}")
-    return render_template('ventas/ventas.html', galletas=galletas)
+    galletas = GalletaDAO.get_costo_galletas()
+    
+    print('ENTRA A VENTAS')
+    orden_venta = []
+    if request.method == "POST":
+        print('ENTRA AL POST')
+
+        datos_orden = request.json.get('orden_venta')
+        print('Datos del Local Storage:', datos_orden)
+
+        resultado_venta = {
+            'success': True, 
+            'message': 'Venta registrada exitosamente' 
+        }
+
+        print('Resultado de la venta:', resultado_venta)
+        return jsonify(resultado_venta)
+
+    else:
+        print('NO ENTRA AL POST')        
+        
+    return render_template('ventas/ventas.html', galletas=galletas, orden=orden_venta)
+
 
 @app.route('/protected')
 @login_required
