@@ -3,6 +3,14 @@
 <!-- CONFIGURACIÓN DE OPCIONES MENU -->
 {% block menu_links %}
 <div style="justify-content: right;">
+    
+    <ul class="nav navbar-nav">
+        {% if 7 in current_user.permisos %}
+            <li>
+                <a href="/produccion">Produccion</a>
+            </li>
+        {% endif %}
+    </ul>
     <a class="btn btn-primary" href="{{ url_for('logout') }}" style="margin-top:10px;">Logout</a> 
 </div>
 {% endblock %}

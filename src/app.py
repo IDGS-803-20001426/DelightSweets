@@ -14,11 +14,13 @@ from permissions import permission_required
 from validaciones import validarPalabrasConsulta,validarFormulario,validarContrasenia,cargarContraseñasComunes,validarCamposLogin
 from datetime import datetime, timedelta
 import re
+import forms
 
 # Models:
-from models.Models import User,db,PermisoRol, Permiso, Rol,Proveedor,MateriaPrima
+from models.Models import User,db,PermisoRol, Permiso, Rol,Proveedor,MateriaPrima,SolicitudProduccion, Receta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
+from models.produccionDao import ProduccionDAO
 from config import DevelopmentConfig
 
 
@@ -46,7 +48,7 @@ class MyModelView(ModelView):
         
 admin = Admin(
     app,
-    name='Panel Administrador',  # Nombre personalizado para el panel de administración
+    name='Cookies',  # Nombre personalizado para el panel de administración
     base_template='layoutMaster.html',  # Plantilla base personalizada
     template_mode='bootstrap3'  # Modo de plantilla 
 )
@@ -229,6 +231,90 @@ def admin_panel():
 @permission_required(4)
 def protected():
     return "<h1>Esta es una vista protegida, solo para usuarios autenticados.</h1>"
+#Modulos personalizados------------------------------------------------------------------------------------
+
+@app.route('/produccion',methods=["GET","POST"])
+@login_required
+@permission_required(7)
+def produccion():
+    form=forms.ProduccionModificarForm(request.form)
+    modProduccion = ProduccionDAO.obtenerRecetasConSolicitudes(db)
+    if request.method == 'POST':
+        mensajes_error = []
+        estatusTxt = {
+            0: 'Solicitada',
+            1: 'Terminada',
+            2: 'Cancelada'
+        }
+        if form.estatusProduccion.data == "":
+            mensajes_error.append("Selecciona un estatus.")
+            return jsonify({'errors': mensajes_error})
+        
+        estatus = int(form.estatusProduccion.data)
+        estatusTexto = estatusTxt.get(estatus,'Estatus Desconocido')
+        idProd = int(form.id.data)
+        estatusDB = ProduccionDAO.obtenerEstatusPorId(db,idProd)
+        
+        if estatusTexto == estatusDB:
+            mensajes_error.append("La solicitud ya cuenta con este estatus.")
+            return jsonify({'errors': mensajes_error})
+        if estatusDB == 'Terminada' or estatusDB == 'Cancelada':
+            mensajes_error.append("El estatus ya no puede ser cambiado.")
+            return jsonify({'errors': mensajes_error})
+
+        #Permite actualizar el estatus del registro
+        ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+        #Obtener datos producción & receta-------------------------------------------------
+        datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
+        numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
+        #Insertar inventario_producto_terminado
+        ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas)
+        if estatus == 1:
+            actualizarInventario(db, datosReceta.id_receta)
+        
+        return jsonify({'exito': 'ok'})
+    return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
+
+
+
+def actualizarInventario(db, id_receta):
+    # Obtener las materias primas requeridas por la receta
+    materias_primas_requeridas = ProduccionDAO.obtenerMateriasPrimasPorReceta(db, id_receta)
+    
+    # Iterar sobre cada materia prima requerida
+    for materia_prima in materias_primas_requeridas:
+        id_materia = materia_prima.id_materia
+        cantidad_requerida = materia_prima.cantidad
+        
+        # Obtener el inventario de la materia prima ordenado por fecha de caducidad
+        inventario = ProduccionDAO.obtenerMateriasPrimasInventario(db, id_materia)
+        
+        # Verificar si hay suficiente cantidad disponible en el inventario
+        cantidad_disponible_total = sum(item.cantidad for item in inventario)
+        if cantidad_disponible_total < cantidad_requerida:
+            print(f"No hay suficiente cantidad disponible de la materia prima con ID {id_materia}.")
+            continue
+        
+        # Consumir la cantidad necesaria de la materia prima
+        cantidad_consumida = 0
+        for item in inventario:
+            if cantidad_requerida <= 0:
+                break
+            
+            if item.cantidad <= cantidad_requerida:
+                cantidad_consumida += item.cantidad
+                cantidad_requerida -= item.cantidad
+                item.cantidad = 0
+            else:
+                cantidad_consumida += cantidad_requerida
+                item.cantidad -= cantidad_requerida
+                cantidad_requerida = 0
+        
+        # Guardar los cambios en la base de datos para esta materia prima
+        db.session.commit()
+
+
+
 
 #Rutas login & Home ----------------------------------------------------------------------------------------
 @app.route('/')
@@ -370,7 +456,7 @@ def verificarPermisoUsuario(usuario_id, permiso, db):
     if current_user.is_authenticated:
         permissions = UserDAO.get_with_permissions(current_user.id_usuario, db)
         current_user.permisos = permissions
-
+        print(current_user.permisos)
         ultimaSesion = UserDAO.obtenerUltimoInicioSesionExitosoAnterior(current_user.id_usuario,db)
         current_user.ultimaSesion = ultimaSesion
 

@@ -1,0 +1,113 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+
+    <div id="content" class="row">
+        
+        <div class="table-responsive">
+            <div class="row">
+                <div class="col-md-2">
+
+                </div>
+                <div class="col-md-10">
+                    <h2 style="text-align: left;">Modificar Solicitudes Producción</h2>
+                    <table class="table table-striped table-bordered table-hover model-list">
+                        <thead>
+                            <tr>
+                                <th class="column-header">                     
+                                    Fecha 
+                                </th>
+                                <th class="column-header">                      
+                                    Receta
+                                </th>
+                                <th class="column-header">                      
+                                    Estatus
+                                </th>
+                        </thead>      
+                        <tbody>
+                            {%for prod in modProduccion%}
+                            <tr>
+                                <td>{{prod.fecha_solicitud}}</td>
+                                <td>{{prod.nombre_receta}}</td>
+                                <td>{{prod.estatus}}</td>
+                                <td>
+                                    <button onclick="abrirModalCambiarEstatus('{{prod.id_solicitud}}','{{prod.nombre_receta}}')" class="btn btn-warning">Modificar</button>
+                                </td>
+                                
+                            </tr>
+                            {%endfor%}
+                        </tbody>
+                    </table>
+                </div>    
+            </div>
+        </div>
+    </div>
+
+
+
+<script src="../../static/libraries/jquery-3.1.1/jquery.min.js"></script>
+<script>
+    function abrirModalCambiarEstatus(id,nombre) {
+        $('#modalCambiarEstatusProd').modal('show');
+        $('#titulo-modal').text('Modificar Estatus "' + nombre + '"');
+        $('#id').val(id);
+        actualizarEstatus();
+    }
+
+    function actualizarEstatus(){
+        // Controlador de eventos para el envío del formulario de cambio de contraseña
+        $('#formCambiarEstatus').submit(function(event) {
+                event.preventDefault();                
+                var formData = $(this).serialize();
+                
+                $.ajax({
+                    url: '/produccion',
+                    type: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        console.log(response); 
+                        if (response.exito === 'ok') {
+                            $('#modalCambiarEstatusProd').modal('hide');
+                            location.reload();
+                        } else if (response.errors) {
+                            $('#error-messages').empty(); 
+                            response.errors.forEach(function(error) {
+                                $('#error-messages').append('<div>' + error + '</div>');
+                            });
+                        }                            
+                    },
+                    error: function(xhr, status, error) {
+                        console.error(xhr.responseText);
+                    }
+                });
+            });
+    }
+</script>
+{% from "_macros.html" import render_field%}
+ <!-- MODAL PARA CAMBIAR ESTATUS PRODUCCIÓN -->
+<div class="modal fade" id="modalCambiarEstatusProd" tabindex="-1" aria-labelledby="modalCambiarEstatusProd" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title" id="titulo-modal">Modificar Estatus</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCambiarEstatus" method="post" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3" style="display: none;">
+                        {{ render_field(form.id, class="form-control") }}                        
+                    </div>
+                    <div class="mb-3">
+                        {{render_field(form.estatusProduccion,class="form-control")}}
+                        <div id="error-messages" class="text-danger"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
