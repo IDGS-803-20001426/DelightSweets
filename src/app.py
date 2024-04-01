@@ -247,7 +247,8 @@ class SolicitudProduccionView(ModelView):
     column_list = ('id_receta', 'fecha_solicitud', 'fecha_terminacion', 'estatus')
 
     def is_accessible(self):
-        return current_user.is_authenticated
+        permiso = 9
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_form_prefill(self, form, id):
         form.id_receta.choices = [(receta.id_receta, receta.nombre_receta) for receta in Receta.query.all()]
@@ -338,6 +339,10 @@ class GalletaView(ModelView):
         'costo_total_materias_primas': 'Costo Producción',
     }
 
+    def is_accessible(self):
+        permiso = 10
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+
     def on_model_change(self, form, model, is_created):
         model.nombre = sanitizarDatos(form.nombre.data)
         if form.imagen.data:
@@ -424,6 +429,9 @@ class RecetaForm(FlaskForm):
 class RecetaView(ModelView):
     form = RecetaForm
     form_columns = ('btn_materia')
+    def is_accessible(self):
+        permiso = 6
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     def render(self, template, **kwargs):
         rendered = super().render(template, **kwargs)
         return rendered.replace('<form ', '<form id="daniel"')
