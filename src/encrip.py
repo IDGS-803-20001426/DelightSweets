@@ -42,5 +42,5 @@ if __name__ == "__main__":
     mensaje_encriptado1 = "pbvto+sbpbvto://urrw:@127.0.0.1/surbhfwJdoohwd"
     print("Mensaje encriptado:", mensaje_encriptado)
 
-    mensaje_desencriptado = decrypt(mensaje_encriptado, clave)
+    mensaje_desencriptado = decrypt(mensaje_encriptado)
     print("Mensaje desencriptado:", mensaje_desencriptado)
