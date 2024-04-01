@@ -9,6 +9,8 @@
   <link href="../static/libraries/bootstrap-5.3.3/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootsrap Iconos -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <link href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
   <!-- Custom CSS -->
 <style>
     * {
@@ -80,6 +82,59 @@
         
     </ul>
 </div>
+<div class="modal fade" id="cantidadModal" tabindex="-1" role="dialog" aria-labelledby="cantidadModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cantidadModalLabel">Ingrese la cantidad</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <label for="selectMateriasPrimas">Materias primas</label>
+                <select class="form-control" aria-label="Default select example" id="selectMateriasPrimas"></select>
+                <label for="cantidadMateriasPrimas">Cantidad</label>
+                <div>
+                    <input type="number" class="form-control" name="" id="cantidadMateriasPrimas">
+                    <small class="text-danger" id="error-cantidad"></small>
+                </div>
+                <button type="button" class="btn btn-primary" style="margin: 5px 0;" id="registrarMateria">Guardar</button>
+                
+                    <table id="tableMaterias" border="1" width="100%">
+                        <thead>
+                                <th width="25%" style="padding: 5px; display: none; text-align: center;">id_materia</th>
+                                <th width="25%" style="padding: 5px; text-align: center;">materia</th>
+                                <th width="25%" style="padding: 5px; text-align: center;">cantidad</th>
+                                <th width="25%" style="padding: 5px; text-align: center;">Acciones</th>
+                        </thead>
+                        <tbody id="materiasPrimasSeleccionadas">
+                           
+                        </tbody>
+                    </table>
+                
+
+            </div>
+            {% if form %}
+                {% if form.materias_primas %}
+                    {{ form.materias_primas(class="form-control") }}
+                {% endif %}
+                {% if form.cantidad %}
+                    {{ form.cantidad(class="form-control") }}
+                {% endif %}
+                {% if form.btn_materia %}
+                    {{ form.btn_materia(class="form-control") }}
+                {% endif %}
+            {% endif %}
+            <div class="modal-footer">
+                <!-- <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button> -->
+                <button type="button" class="btn btn-primary" onclick="guardarCantidad()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Main Wrapper -->
 <div class="p-1 my-container active-cont">
     <!-- Top Nav -->
@@ -121,4 +176,114 @@
     });
 </script>
 <script src="../static/libraries/bootstrap-5.3.3/js/bootstrap.bundle.min.js"></script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Aplicar Select2 a todos los campos de selección múltiple
+        $('select[multiple]').select2();
+    
+        const tipoMerma = document.querySelector('input[name="tipo_merma"]:checked').value;
+            if (tipoMerma === '1') {
+                $("#select_galleta_individual, label[for='select_galleta_individual']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma").closest('.form-group').css("display", "none");
+            } else {
+                $("#select_galleta_lote, label[for='select_galleta_lote']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma").closest('.form-group').css("display", "block");
+            }
+    });
+
+    $('input[name="tipo_merma"]').on('change', function() {
+        const tipoMerma = document.querySelector('input[name="tipo_merma"]:checked').value;
+            if (tipoMerma === '1') {
+                $("#select_galleta_lote, label[for='select_galleta_lote']").closest('.form-group').css("display", "block");
+                $("#select_galleta_individual, label[for='select_galleta_individual']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma").closest('.form-group').css("display", "none");
+            } else {
+                $("#select_galleta_individual, label[for='select_galleta_individual']").closest('.form-group').css("display", "block");
+                $("#select_galleta_lote, label[for='select_galleta_lote']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma").closest('.form-group').css("display", "block");  
+            }
+    });
+
+    function abrirModal(){
+        $("#cantidadModal").modal("show");
+    }
+
+    // Función para enviar la cantidad al backend
+    function guardarCantidad() {
+        var datos = [];
+
+        // Recorrer cada fila de la tabla, excluyendo la fila de encabezado (thead)
+    // Recorrer cada fila de la tabla, excluyendo la fila de encabezado (thead)
+        $('#materiasPrimasSeleccionadas tr').each(function() {
+            var fila = {};
+            $(this).find('td').each(function(colIndex) {
+                console.log($('#tableMaterias thead th').eq(colIndex).text())
+                var nombreColumna = $('#tableMaterias thead th').eq(colIndex).text(); // Obtener el nombre de la columna
+                fila[nombreColumna] = $(this).text(); // Asignar el texto de la celda al objeto de fila usando el nombre de la columna como clave
+            });
+            // Agregar el objeto de fila al arreglo de datos
+            datos.push(fila);
+        });
+
+        $("#datos_materias_primas").val(JSON.stringify(datos));
+
+        $('#cantidadModal').modal('hide');
+    }
+
+    $("#registrarMateria").click(function(){    
+        $("#error-cantidad").html("");
+        const idMateria = $("#selectMateriasPrimas").val();
+        const nombre = $("#selectMateriasPrimas option:selected").text()
+        const cantidad = $("#cantidadMateriasPrimas").val();
+
+        if(cantidad <= 0 || cantidad == ""){
+            $("#error-cantidad").append("Se necesita una cantidad");
+            return;
+        }
+
+        var fechaActual = new Date();
+        var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
+        $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + idMateria + "</td><td style='padding: 2px;'>" + nombre + "</td><td style='padding: 2px;'>" + cantidad + "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual.getTime()+numeroAleatorio + "'>Eliminar</button></td></tr>")
+    });
+
+    $('#materiasPrimasSeleccionadas').on('click', '.eliminar', function() {
+        console.log("hoal")
+        $(this).closest('tr').remove(); // Eliminar la fila más cercana
+    });
+
+    $("#btn_modal").click(function(){
+        $("#materiasPrimasSeleccionadas").html("");
+
+        var datos = $("#datos_materias_primas").val();
+        var datos_json = JSON.parse(datos);
+        
+        var fechaActual = new Date();
+        var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
+        datos_json.forEach(function(materias){
+            $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + materias['id_materia'] + "</td><td style='padding: 2px;'>" + materias['materia'] + "</td><td style='padding: 2px;'>" + materias['cantidad'] + "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual.getTime()+numeroAleatorio + "'>Eliminar</button></td></tr>")
+        });
+
+    });
+
+    fetch('/materias_primas')
+        .then(response => response.json())
+        .then(data => {
+            // Llenar el campo de selección con las opciones recibidas
+            const select = document.getElementById('selectMateriasPrimas');
+            data.forEach(opcion => {
+                const option = document.createElement('option');
+                option.value = opcion.id;
+                option.text = opcion.nombre;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error al obtener las opciones de materias primas:', error);
+        });
+</script>
+</script>
 {% endblock %}
