@@ -1,4 +1,4 @@
-from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia
+from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta
 from sqlalchemy import func
 
 class GalletaDAO:
@@ -35,4 +35,40 @@ class GalletaDAO:
 
             return resultado
         except Exception as ex:
+            raise Exception(ex)
+
+class VentaDAO:
+
+    @classmethod
+    def insert_venta(cls, fecha_venta, hora_venta, subtotal, total):
+        try:
+            nueva_venta = Venta(
+                fecha_venta=fecha_venta,
+                hora_venta=hora_venta,
+                subtotal=subtotal,
+                total=total
+            )
+            db.session.add(nueva_venta)
+            db.session.commit()
+            return nueva_venta.id_venta
+        except Exception as ex:
+            db.session.rollback()
+            raise Exception(ex)
+
+class DetalleVentaDAO:
+
+    @classmethod
+    def insert_detalle_venta(cls, id_venta, id_galleta, medida, cantidad, total):
+        try:
+            nuevo_detalle_venta = DetalleVenta(
+                id_venta=id_venta,
+                id_galleta=id_galleta,
+                medida=medida,
+                cantidad=cantidad,
+                total=total
+            )
+            db.session.add(nuevo_detalle_venta)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
             raise Exception(ex)

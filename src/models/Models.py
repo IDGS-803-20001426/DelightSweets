@@ -80,3 +80,24 @@ class Equivalencia(db.Model):
     gramaje = db.Column(db.Float, nullable=False)
 
     receta = db.relationship('Receta', backref=db.backref('equivalencias', lazy=True))
+
+class Venta(db.Model):
+    __tablename__ = 'venta'
+    
+    id_venta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    fecha_venta = db.Column(db.DateTime, nullable=False)
+    hora_venta = db.Column(db.Time, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    total = db.Column(db.Float, nullable=False)
+
+class DetalleVenta(db.Model):
+    __tablename__ = 'detalle_venta'
+    
+    id_detalle_venta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_venta = db.Column(db.SmallInteger, db.ForeignKey('venta.id_venta'), nullable=False)
+    id_galleta = db.Column(db.SmallInteger, nullable=False)
+    medida = db.Column(db.String(20), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    total = db.Column(db.Float, nullable=False)
+
+    venta = db.relationship('Venta', backref=db.backref('detalles_venta', lazy=True))

@@ -1,9 +1,6 @@
 {% extends './layout.html' %}
 
 {% block title %}Ventas{% endblock %}
-{% block customAssets %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
-{% endblock %}
 {% block customCSS %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ventas.css') }}">
 {% endblock %}
@@ -68,7 +65,7 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">Cancelar Orden</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">Cancelar</button>
                                         <button id="boton_confirmar_orden_{{ galleta.id_galleta }}"  type="button" class="btn btn-primary" onclick="confirmarOrden('{{ galleta.id_galleta }}')">Confirmar Orden</button>
                                         <button type="button" class="btn btn-secondary" onclick="confirmarCancelar('{{ galleta.id_galleta }}')">Eliminar Pedido</button>
                                     </div>

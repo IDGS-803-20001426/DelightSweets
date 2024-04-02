@@ -12,10 +12,19 @@ from werkzeug.security import generate_password_hash
 from models.Models import User,db,Rol,Galleta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
-from models.galletaDao import GalletaDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO
 from config import DevelopmentConfig
 
-
+# PDF
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
+from flask import send_file
+from reportlab.lib.styles import getSampleStyleSheet
+import os
+from datetime import datetime
+import base64
 
 app = Flask(__name__)
 app.config.from_object(DevelopmentConfig)
@@ -100,32 +109,130 @@ def home():
         return render_template('home.html')
 
 
-from flask import jsonify
-
 @app.route('/ventas', methods=["GET", "POST"])
 def ventas():
     galletas = GalletaDAO.get_costo_galletas()
-    
-    print('ENTRA A VENTAS')
     orden_venta = []
+    
     if request.method == "POST":
-        print('ENTRA AL POST')
-
         datos_orden = request.json.get('orden_venta')
-        print('Datos del Local Storage:', datos_orden)
-
-        resultado_venta = {
-            'success': True, 
-            'message': 'Venta registrada exitosamente' 
-        }
-
-        print('Resultado de la venta:', resultado_venta)
-        return jsonify(resultado_venta)
-
-    else:
-        print('NO ENTRA AL POST')        
         
+        fecha_venta = datetime.now().date()
+        hora_venta = datetime.now().time()
+        
+        try:
+            id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
+            pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
+            
+            resultado_venta = {
+                'success': True, 
+                'message': 'Venta registrada exitosamente',
+                'pdf_base64': pdf_base64,  
+                'id_venta': id_venta 
+            }
+
+            return jsonify(resultado_venta)
+        except Exception as ex:
+            resultado_venta = {
+                'success': False, 
+                'message': 'Error al registrar la venta',
+                'error': str(ex)
+            }
+            return jsonify(resultado_venta)
+    
     return render_template('ventas/ventas.html', galletas=galletas, orden=orden_venta)
+
+# -------------- INSERT DE VENTA --------------
+def insertar_venta(datos_orden, fecha_venta, hora_venta):
+    try:
+        subtotal = sum(galleta['costo'] for galleta in datos_orden)
+        impuesto = subtotal * 0.16
+        total = subtotal + impuesto
+        
+        id_venta = VentaDAO.insert_venta(fecha_venta, hora_venta, subtotal, total)        
+
+        for galleta in datos_orden:
+            id_galleta = galleta['id_galleta']
+            medida = galleta['medida']
+            cantidad = galleta['cantidad']
+            total_detalle = round(galleta['costo'], 2)
+            
+            DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, medida, cantidad, total_detalle)
+        
+        return id_venta  
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERT DE VENTA --------------
+
+
+# -------------- GENERACIÓN DEL PDF --------------
+def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
+    subtotal = 0
+    
+    for galleta in orden_venta:
+        subtotal += galleta['costo']
+
+    now = datetime.now()
+    pdf_filename = f"ticket_venta_{id_venta}_{fecha_venta}.pdf"
+    
+    folder_path = os.path.join(os.getcwd(),"tickets_de_venta")
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    pdf_path = os.path.join(folder_path, pdf_filename)
+    
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    elements = []
+
+    logo_path = os.path.join(os.getcwd(), 'static', 'img', 'logo.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=100, height=100)
+        logo.hAlign = 'LEFT'  # Alineación a la izquierda
+        elements.append(logo)
+        elements.append(Spacer(1, 20))
+
+    style = getSampleStyleSheet()['Title']
+    elements.append(Paragraph("DelightSweets", style))
+
+    data = [["Producto", "Cantidad", "Medida", "Costo"]]
+    for galleta in orden_venta:
+        data.append([galleta['nombre'], str(galleta['cantidad']), galleta['medida'], f"${round(galleta['costo'], 2)}"])
+    table = Table(data)
+    table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                               ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                               ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                               ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                               ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                               ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                               ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+    elements.append(table)
+
+    elements.append(Paragraph(f"<b>Subtotal:</b> ${round(subtotal, 2)}", style))
+
+    impuesto = round(subtotal * 0.16, 2)
+    elements.append(Paragraph(f"<b>Impuesto (16%):</b> ${impuesto}", style))
+
+    total = round(subtotal + impuesto, 2)
+    elements.append(Paragraph(f"<b>Total:</b> ${total}", style))
+
+    gracias_style = getSampleStyleSheet()['Normal']
+
+    gracias_style.fontSize = 20
+    gracias_style.fontName = 'Helvetica-Bold'
+    gracias_style.textColor = colors.brown
+    gracias_style.alignment = 1
+
+    elements.append(Paragraph("Gracias por su compra", gracias_style))
+
+    doc.build(elements)
+
+    with open(pdf_path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    return pdf_base64
+
+# -------------- GENERACIÓN DEL PDF --------------
 
 
 @app.route('/protected')

@@ -4,6 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function enviarDatosLocalStorageAlServidor() {
+    
+    var confirmacion = confirm("¿Deseas confirmar la venta?");
+    if (!confirmacion) {
+        return;
+    }
+
     var ordenVenta = JSON.parse(localStorage.getItem('orden_venta')) || [];
     console.log('Datos del Local Storage:', ordenVenta);
 
@@ -28,12 +34,17 @@ function enviarDatosLocalStorageAlServidor() {
         console.log('Datos del servidor (JSON):', data);
         if (data.success) {
             showAlert('success', data.message);
-            generarPDF(ordenVenta);
-            if (data.success) {
-                setTimeout(function() {
-                    window.location.reload();
-                }, 2000);
-            }
+            setTimeout(function() {
+                localStorage.clear();
+                window.location.reload();
+                if (data.pdf_base64) {
+                    var pdfWindow = window.open("");
+                    pdfWindow.document.write(
+                        "<iframe width='100%' height='100%' src='data:application/pdf;base64, " + 
+                        encodeURI(data.pdf_base64) + "'></iframe>"
+                    );
+                }
+            }, 1500);
         } else {
             showAlert('error', data.message);
         }
@@ -43,6 +54,7 @@ function enviarDatosLocalStorageAlServidor() {
         showAlert('error', 'Error al enviar los datos del localStorage al servidor');
     });
 }
+
 
 function showAlert(type, message) {
     var alertDiv = document.createElement('div');
@@ -396,35 +408,3 @@ function habilitarConfirmarOrden(galletaId) {
     botonConfirmarOrden.disabled = true;
 }
 
-function generarPDF(ordenVenta) {
-    // Crear un nuevo documento PDF
-    var doc = new jsPDF();
-    
-    // Agregar encabezado
-    doc.text('Listado de Ventas', 10, 10);
-
-    // Agregar detalles de las órdenes de venta
-    var y = 30; // Posición inicial
-    ordenVenta.forEach(function(orden) {
-        doc.text(orden.nombre + ': $' + orden.costo.toFixed(2), 10, y);
-        y += 10; // Incrementar la posición para el siguiente elemento
-    });
-
-    // Calcular subtotal y total
-    var subtotal = ordenVenta.reduce((acc, curr) => acc + curr.costo, 0);
-    var impuestos = subtotal * 0.16;
-    var total = subtotal + impuestos;
-
-    // Agregar subtotal y total al documento
-    doc.text('Subtotal: $' + subtotal.toFixed(2), 10, y + 10);
-    doc.text('Total (incluyendo impuestos): $' + total.toFixed(2), 10, y + 20);
-
-    // Obtener los datos del PDF como datos URI
-    var pdfDataUri = doc.output('datauristring');
-
-    // Crear un enlace para abrir el PDF
-    var link = document.createElement('a');
-    link.href = pdfDataUri;
-    link.download = 'listado_ventas.pdf';
-    link.click();
-}
