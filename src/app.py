@@ -671,10 +671,22 @@ class MermaProdTerminadoView(ModelView):
                 model.id_inventario_prod_terminado = inventarios[0].id_inventario_prod_terminado
 
 class MermaProduccionForm(FlaskForm):
-    id_materia = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
-    cantidad= IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
+    tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='1', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
+    select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
+    select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
+    cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
     fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     motivo = StringField("Motivo", validators=[DataRequired()])
+
+    def _query_lote_materias(self):
+        return db.session.query(
+                    Inventario.id_inventario,
+                    MateriaPrima.nombre,
+                    Inventario.fecha_caducidad,
+                    Inventario.cantidad
+                ).join(MateriaPrima, Inventario.id_materia == MateriaPrima.id_materia)\
+                .join(Proveedor, Inventario.id_proveedor == Proveedor.id_proveedor)\
+                .filter(Inventario.estatus == 1).all()
 
     def _query_materias(self, id_materia):
         query = db.session.query(
@@ -698,27 +710,31 @@ class MermaProduccionForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         super(MermaProduccionForm, self).__init__(*args, **kwargs)
-        choices = [(str(row.id_materia), f"{row.nombre_materia}") for row in self._query_materias(None)]
-        self.id_materia.choices = choices
+        choices_individual = [(str(row.id_materia), f"{row.nombre_materia}") for row in self._query_materias(None)]
+        choices_lote = [(str(row.id_inventario), f"{row.nombre} - Caducidad: {row.fecha_caducidad} - {row.cantidad} en inventario") for row in self._query_lote_materias()]
+        self.select_materia_individual.choices = choices_individual
+        self.select_materia_lote.choices = choices_lote
 
     def validate(self):
         if not super().validate():
             return False
 
-        id_materia = self.id_materia.data
-        
-        # Obtener la cantidad total correspondiente a la galleta seleccionada y con estatus 1
-        inventario_res = self._query_materias(id_materia)
-        if not inventario_res:
-            flash('No hay inventario disponible para la materia seleccionada.', 'error')
-            return False
+        if self.tipo_merma_materia.data == "2":
+            id_materia = self.select_materia_individual.data
+            
+            # Obtener la cantidad total correspondiente a la galleta seleccionada y con estatus 1
+            inventario_res = self._query_materias(id_materia)
+            if not inventario_res:
+                flash('No hay inventario disponible para la materia seleccionada.', 'error')
+                return False
 
-        total_cantidad = inventario_res.total_cantidad
-        
-        if self.cantidad.data > total_cantidad:
-            flash('La cantidad de merma es mayor que la cantidad en inventario.', 'error')
-            return False
-        
+            total_cantidad = inventario_res.total_cantidad
+            
+            if self.cantidad_merma_materia.data > total_cantidad:
+                flash('La cantidad de merma es mayor que la cantidad en inventario.', 'error')
+                return False
+            
+            return True
         return True
     
 class MermaProduccionView(ModelView):
@@ -730,10 +746,38 @@ class MermaProduccionView(ModelView):
         'id_materia': lambda v, c, m, p: m.materia_prima.nombre if m.materia_prima else "Galleta Desconocida"
     }
 
-    def after_model_change(self, form, model, is_created):
-        if is_created:
-            cantidad_merma = form.cantidad.data
-            id_materia = form.id_materia.data
+
+    def on_model_change(self, form, model, is_created):
+        if form.tipo_merma_materia.data == "1":
+            model.id_materia = form.select_materia_individual.data
+            model.cantidad = 0
+            inventario_seleccionado = db.session.query(
+                Inventario
+            ).filter(
+                Inventario.id_inventario == form.select_materia_lote.data
+            ).first()
+
+            if inventario_seleccionado:
+                # Asignar los valores del inventario seleccionado al modelo
+                model.id_materia = inventario_seleccionado.id_materia
+                model.cantidad = inventario_seleccionado.cantidad
+                model.fecha = form.fecha.data
+                model.motivo = form.motivo.data
+
+                # Actualizar el estatus y la cantidad del inventario seleccionado a 0
+                inventario_seleccionado.estatus = 0
+                inventario_seleccionado.cantidad = 0
+
+                # Guardar los cambios en la base de datos
+                db.session.commit()
+        elif form.tipo_merma_materia.data == "2":
+            model.id_materia = form.select_materia_individual.data
+            model.cantidad = form.cantidad_merma_materia.data
+            model.fecha = form.fecha.data
+            model.motivo = form.motivo.data
+
+            cantidad_merma = form.cantidad_merma_materia.data
+            id_materia = form.select_materia_individual.data
 
             # Obtener los registros de inventario correspondientes a la materia prima seleccionada
             inventario_registros = db.session.query(Inventario).filter(
@@ -756,9 +800,6 @@ class MermaProduccionView(ModelView):
                     # simplemente restar la cantidad de merma y salir del bucle
                     inventario.cantidad -= cantidad_merma
                     break
-            
-            db.session.commit()
-        
 
 
 

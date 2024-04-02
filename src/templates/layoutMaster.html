@@ -184,7 +184,7 @@
     $(document).ready(function() {
         // Aplicar Select2 a todos los campos de selección múltiple
         $('select[multiple]').select2();
-    
+           
         const tipoMerma = document.querySelector('input[name="tipo_merma"]:checked').value;
             if (tipoMerma === '1') {
                 $("#select_galleta_individual, label[for='select_galleta_individual']").closest('.form-group').css("display", "none");
@@ -192,6 +192,17 @@
             } else {
                 $("#select_galleta_lote, label[for='select_galleta_lote']").closest('.form-group').css("display", "none");
                 $("#cantidad_merma").closest('.form-group').css("display", "block");
+            }    
+    });
+
+    $(document).ready(function(){
+        const tipoMermaMateria = document.querySelector('input[name="tipo_merma_materia"]:checked').value;
+            if (tipoMermaMateria === '1') {
+                $("#select_materia_individual, label[for='select_materia_individual']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma_materia").closest('.form-group').css("display", "none");
+            } else {
+                $("#select_materia_lote, label[for='select_materia_lote']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma_materia").closest('.form-group').css("display", "block");
             }
     });
 
@@ -205,6 +216,19 @@
                 $("#select_galleta_individual, label[for='select_galleta_individual']").closest('.form-group').css("display", "block");
                 $("#select_galleta_lote, label[for='select_galleta_lote']").closest('.form-group').css("display", "none");
                 $("#cantidad_merma").closest('.form-group').css("display", "block");  
+            }
+    });
+
+    $('input[name="tipo_merma_materia"]').on('change', function() {
+        const tipoMermaMateria = document.querySelector('input[name="tipo_merma_materia"]:checked').value;
+            if (tipoMermaMateria === '1') {
+                $("#select_materia_lote, label[for='select_materia_lote']").closest('.form-group').css("display", "block");
+                $("#select_materia_individual, label[for='select_materia_individual']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma_materia").closest('.form-group').css("display", "none");
+            } else {
+                $("#select_materia_individual, label[for='select_materia_individual']").closest('.form-group').css("display", "block");
+                $("#select_materia_lote, label[for='select_materia_lote']").closest('.form-group').css("display", "none");
+                $("#cantidad_merma_materia").closest('.form-group').css("display", "block");  
             }
     });
 
