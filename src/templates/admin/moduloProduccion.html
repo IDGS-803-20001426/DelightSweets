@@ -1,15 +1,15 @@
-{% extends 'layout.html' %}
-
+{% import 'admin/layout.html' as layout with context -%}
+{% extends 'admin/base.html' %}
 {% block body %}
 
     <div id="content" class="row">
         
         <div class="table-responsive">
             <div class="row">
-                <div class="col-md-2">
+                <div class="col-md-1">
 
                 </div>
-                <div class="col-md-10">
+                <div class="col-md-8">
                     <h2 style="text-align: left;">Modificar Solicitudes Producción</h2>
                     <table class="table table-striped table-bordered table-hover model-list">
                         <thead>
@@ -110,4 +110,4 @@
 </div>
 
 
-{% endblock %}
+{% endblock body%}

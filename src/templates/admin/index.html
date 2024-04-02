@@ -1,39 +1,34 @@
-{% extends 'admin/base.html' %}
-
+{% extends 'admin/master.html' %}
 <!-- CONFIGURACIÓN DE OPCIONES MENU -->
 {% block menu_links %}
 <div style="justify-content: right;">
-    
-    <ul class="nav navbar-nav">
-        {% if 7 in current_user.permisos %}
-            <li>
-                <a href="/produccion">Produccion</a>
-            </li>
-        {% endif %}
-    </ul>
     <a class="btn btn-primary" href="{{ url_for('logout') }}" style="margin-top:10px;">Logout</a> 
 </div>
 {% endblock %}
 
-<!-- CONFIGURACIÓN DE TITULO -->
-{% block title %}Home{% endblock %}
-
 <!-- CONFIGURACIÓN DE BODY -->
 {% block body %}
+{{ super() }}
+{% if current_user %}
+    <section class="content-header">
+        <h1>
+            {% if current_user.rol == 1 %}
+                Bienvenido Administrador
+            {% elif current_user.rol == 2 %}
+                Bienvenido Cocinero
+            {% elif current_user.rol == 3 %}
+                Bienvenido Vendedor
+            {% endif %}
+        <small>{{ current_user.nombre_completo|title }}</small>
+        </h1>
+        <h3>
+            <small>Tu último inicio de sesión registrado fue: <b>{{ current_user.ultimaSesion|title }}</b></small>
+        </h3>
+    </section>
 
-    {% if current_user %}
-        {% if current_user.rol == 1 %}
-            <h1>Bienvenido Administrador, {{ current_user.nombre_completo|title }}</h1>
-        {% elif current_user.rol == 2 %}
-            <h1>Bienvenido Cocinero, {{ current_user.nombre_completo|title }}</h1>
-        {% elif current_user.rol == 3 %}
-            <h1>Bienvenido Vendedor, {{ current_user.nombre_completo|title }}</h1>
-        {% endif %}
-        <h3>Tu último inicio de sesión registrado fue: {{ current_user.ultimaSesion|title }}</h3>
-        <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
+    <a class="btn btn-secondary" href="{{ url_for('logout') }}">Logout</a>
 
-    {% else %}
-        {% include 'errores/401.html' %}
-    {% endif %}
-
-{% endblock %}
+{% else %}
+    {% include 'errores/401.html' %}
+{% endif %}
+ {% endblock body %}

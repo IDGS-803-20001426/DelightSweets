@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash,jsonify,abort
+from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort
 from flask_wtf.csrf import CSRFProtect
 from flask_wtf import FlaskForm
 from flask_mysqldb import MySQL
@@ -49,7 +49,7 @@ def load_user(id_usuario):
         
 class MyModelView(ModelView):
     list_template = 'admin/list.html'
-    base_template = 'layoutMaster.html'
+    base_template = 'admin/base.html'
     # @permission_required(1)
 
     def is_accessible(self):
@@ -59,14 +59,14 @@ class MyModelView(ModelView):
         
 admin = Admin(
     app,
-    name='Cookies',  # Nombre personalizado para el panel de administración
-    base_template='layoutMaster.html',  # Plantilla base personalizada
-    template_mode='bootstrap3'  # Modo de plantilla 
+    name='BakedSmiles',  # Nombre personalizado para el panel de administración
+    base_template='admin/base.html',  # Plantilla base personalizada
+    template_mode='bootstrap4'  # Modo de plantilla 
 )
 
 #Clase Usuarios ------------------------------------------------------------------------
 
-class UserView(MyModelView):
+class UserView(ModelView):
     column_exclude_list = ('contrasenia')  # No muestra en la tabla lista
     form_excluded_columns = ('fecha_password')  # Campos Excluidos de los formularios
 
@@ -167,7 +167,7 @@ class PermisoRolView(ModelView):
         return form
     
 #Clase Proveedores ------------------------------------------------------------------------
-class ProveedorView(MyModelView):
+class ProveedorView(ModelView):
     def is_accessible(self):
         permiso = 3
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -184,7 +184,7 @@ class ProveedorView(MyModelView):
         
         return form_class
 #Clase Permiso ------------------------------------------------------------------------
-class PermisoView(MyModelView):
+class PermisoView(ModelView):
     def is_accessible(self):
         permiso = 2
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -195,7 +195,7 @@ class PermisoView(MyModelView):
         return form_class
 
 #Clase Rol ------------------------------------------------------------------------
-class RolView(MyModelView):
+class RolView(ModelView):
     def is_accessible(self):
         permiso = 2
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -206,7 +206,7 @@ class RolView(MyModelView):
         validarFormulario(form_class, ['nombre'])
         return form_class
 #Clase MateriaPrima ------------------------------------------------------------------------
-class MateriaPrimaView(MyModelView):
+class MateriaPrimaView(ModelView):
     def is_accessible(self):
         permiso = 5
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -740,18 +740,36 @@ def sanitizarDatos(inputString):
     return cadenaSanitizadda
 
 #### Añadir views to admin --------------------------------------------------------------------------------------
-admin.add_view(UserView(User,db.session,name="usuarios"))
-admin.add_view(RolView(Rol,db.session,category='Administración Permisos',name="Rol"))
-admin.add_view(PermisoView(Permiso,db.session,category='Administración Permisos',name="Permiso"))
-admin.add_view(PermisoRolView(PermisoRol,db.session,category='Administración Permisos',name="Permisos-Roles"))
-admin.add_view(ProveedorView(Proveedor,db.session,name="Proveedor"))
-admin.add_view(MateriaPrimaView(MateriaPrima,db.session,name="Materia Prima"))
+# admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
+# admin.add_view(RolView(Rol,db.session,category='Adm. Permisos ',name="Rol"))
+# admin.add_view(PermisoView(Permiso,db.session,category='Adm. Permisos ',name="Permiso"))
+# admin.add_view(PermisoRolView(PermisoRol,db.session,category='Adm. Permisos ',name="Permisos-Roles"))
+# admin.add_view(ProveedorView(Proveedor,db.session,menu_icon_type='fa', menu_icon_value='fa-id-card-o',name="Proveedor"))
+# admin.add_view(MateriaPrimaView(MateriaPrima,db.session,menu_icon_type='fa', menu_icon_value='fa-shopping-basket ',name="Materia Prima"))
 
-admin.add_view(RecetaView(Receta, db.session, name="Recetas"))
-admin.add_view(SolicitudProduccionView(SolicitudProduccion, db.session, name="Solicitud Producción"))
-admin.add_view(InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, name="Inventario en venta"))
-admin.add_view(GalletaView(Galleta, db.session, name="Galletas"))
-admin.add_view(MermaProdTerminadoView(MermaProdTerminado, db.session, name="Merma Galletas"))
+# admin.add_view(RecetaView(Receta, db.session,menu_icon_type='fa', menu_icon_value='fa-spoon',name="Recetas"))
+# admin.add_view(SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus',name="Solicitud Producción"))
+# admin.add_view(InventarioProductoTerminadoView(InventarioProductoTerminado, db.session,menu_icon_type='fa', menu_icon_value='fa-calculator',name="Inventario en venta"))
+# admin.add_view(GalletaView(Galleta, db.session,menu_icon_type='fa', menu_icon_value='fa-cutlery',name="Galletas"))
+# admin.add_view(MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o',name="Merma Galletas"))
+
+# Define tus blueprints
+admin_blueprints = [
+    UserView(User, db.session, menu_icon_type='fa', menu_icon_value='fa-user', name="Usuarios"),
+    RolView(Rol, db.session, category='Adm. Permisos ', name="Rol"),
+    PermisoView(Permiso, db.session, category='Adm. Permisos ', name="Permiso"),
+    PermisoRolView(PermisoRol, db.session, category='Adm. Permisos ', name="Permisos-Roles"),
+    ProveedorView(Proveedor, db.session, menu_icon_type='fa', menu_icon_value='fa-id-card-o', name="Proveedor"),
+    MateriaPrimaView(MateriaPrima, db.session, menu_icon_type='fa', menu_icon_value='fa-shopping-basket ', name="Materia Prima"),
+    RecetaView(Receta, db.session, menu_icon_type='fa', menu_icon_value='fa-spoon', name="Recetas"),
+    SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus', name="Solicitud Producción"),
+    InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
+    GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
+    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas")
+]
+# Agrega tus blueprints a Flask-Admin
+for blueprint in admin_blueprints:
+    admin.add_view(blueprint)
 
 
 @app.route('/admin')
@@ -771,7 +789,8 @@ def protected():
     return "<h1>Esta es una vista protegida, solo para usuarios autenticados.</h1>"
 #Modulos personalizados------------------------------------------------------------------------------------
 
-@app.route('/produccion',methods=["GET","POST"])
+produccion_bp = Blueprint('produccion', __name__)
+@produccion_bp.route('/produccion', methods=["GET", "POST"])
 @login_required
 @permission_required(7)
 def produccion():
@@ -814,6 +833,51 @@ def produccion():
     return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
 
 
+class ProduccionAdminView(BaseView):
+    @login_required
+    @permission_required(7)
+    @expose('/')
+    def index(self):
+        form=forms.ProduccionModificarForm(request.form)
+        modProduccion = ProduccionDAO.obtenerRecetasConSolicitudes(db)
+        if request.method == 'POST':
+            mensajes_error = []
+            estatusTxt = {
+                0: 'Solicitada',
+                1: 'Terminada',
+                2: 'Cancelada'
+            }
+            if form.estatusProduccion.data == "":
+                mensajes_error.append("Selecciona un estatus.")
+                return jsonify({'errors': mensajes_error})
+            
+            estatus = int(form.estatusProduccion.data)
+            estatusTexto = estatusTxt.get(estatus,'Estatus Desconocido')
+            idProd = int(form.id.data)
+            estatusDB = ProduccionDAO.obtenerEstatusPorId(db,idProd)
+            
+            if estatusTexto == estatusDB:
+                mensajes_error.append("La solicitud ya cuenta con este estatus.")
+                return jsonify({'errors': mensajes_error})
+            if estatusDB == 'Terminada' or estatusDB == 'Cancelada':
+                mensajes_error.append("El estatus ya no puede ser cambiado.")
+                return jsonify({'errors': mensajes_error})
+
+            #Permite actualizar el estatus del registro
+            ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+            #Obtener datos producción & receta-------------------------------------------------
+            datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
+            numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
+            #Insertar inventario_producto_terminado
+            ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
+            if estatus == 1:
+                actualizarInventario(db, datosReceta.id_receta)
+            
+            return jsonify({'exito': 'ok'})
+        return self.render('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
+
+# Registrar la vista de Flask-Admin para tu blueprint produccion_bp
+admin.add_view(ProduccionAdminView(name='Produccion', endpoint='produccion_admin'))
 
 def actualizarInventario(db, id_receta):
     # Obtener las materias primas requeridas por la receta
@@ -1015,9 +1079,11 @@ def status_404(error):
     return render_template('errores/404.html'),404
 #----------------------------------------------------------------
 
+
 if __name__ == '__main__':
     csrf.init_app(app)
     db.init_app(app)
+    app.register_blueprint(produccion_bp)
     app.register_error_handler(401, status_401)
     app.register_error_handler(403, status_403)
     app.register_error_handler(404, status_404)
