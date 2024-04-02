@@ -21,13 +21,13 @@ import re
 import forms
 import base64
 import json
-from sqlalchemy import func
+from sqlalchemy import func, asc
 import MySQLdb
 
 
 
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -501,42 +501,6 @@ class RecetaView(ModelView):
             form.gramaje.data = equivalencia.gramaje
             form.piezas.data = equivalencia.piezas
 
-    '''
-    def edit_form(self, obj=None):
-        form = super().edit_form(obj)
-            # Obtener los registros asociados a la receta específica
-        registros_intermedios = RecetaMateriaIntermedia.query.filter_by(id_receta=obj.id_receta).all()
-
-        
-        # Crear una lista para almacenar los datos de materias primas
-        datos = []
-
-        # Iterar sobre los registros intermedios y crear un diccionario con los datos de cada uno
-        for registro in registros_intermedios:
-            datos_materia = {
-                'id_materia': registro.id_materia,
-                'cantidad': registro.cantidad
-            }
-            # Agregar el diccionario a la lista
-            datos.append(datos_materia)
-
-        # Asignar la lista de datos de materias primas al campo correspondiente del formulario
-        form.datos_materias_primas.data = json.dumps(datos)
-        
-
-        for registro in registros_intermedios:
-            datos = '{"id_materia": "' + str(registro.id_materia) + '", "cantidad": "' + str(registro.cantidad) + '"}'
-
-        form.datos_materias_primas.data = datos
-        # Obtener la equivalencia asociada a la receta
-        equivalencia = obj.equivalencias
-        
-        if equivalencia:
-            # Asignar el valor de gramaje al campo correspondiente del formulario
-            form.gramaje.data = equivalencia.gramaje
-            form.piezas.data = equivalencia.piezas
-        return form
-    '''
     def on_model_change(self, form, model, is_created):
         model.nombre_receta = form.nombre_receta.data
         model.id_galleta = form.id_galleta.data
@@ -570,24 +534,6 @@ class RecetaView(ModelView):
             
         # Confirmar los cambios para guardar los objetos en la base de datos
         db.session.commit()
-    '''
-    def after_model_change(self, form, model, is_created):
-        # Actualizar las cantidades en la tabla intermedia RecetaMateriaIntermedia
-        for materia_form in form.materias:
-            materia_id = materia_form.data
-            cantidad = 100
-            if cantidad is not None:  # Verificar si la cantidad no es None
-                receta_materia = RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta, id_materia=materia_id).first()
-                if receta_materia:
-                    receta_materia.cantidad = cantidad
-            
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error: {str(e)}', 'error')       
-    '''
-
 
 class MermaProdTerminadoForm(FlaskForm):
     tipo_merma = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='1', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
@@ -595,6 +541,7 @@ class MermaProdTerminadoForm(FlaskForm):
     select_galleta_lote = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma = IntegerField('Cantidad', validators=[NumberRange(min=1)], default=1)
     fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M')
+    motivo = StringField("Motivo", validators=[DataRequired()])
 
     def _query_inventario(self):
         return (
@@ -661,7 +608,7 @@ class MermaProdTerminadoForm(FlaskForm):
 
 class MermaProdTerminadoView(ModelView):
     form = MermaProdTerminadoForm
-    column_list = ('galleta', 'cantidad', 'fecha')
+    column_list = ('galleta', 'cantidad', 'fecha', 'motivo')
 
     column_formatters = {
         'galleta': lambda v, c, m, p: m.inventario_prod_terminado.galleta.nombre if m.inventario_prod_terminado else "Galleta Desconocida"
@@ -723,6 +670,137 @@ class MermaProdTerminadoView(ModelView):
             if is_created:
                 model.id_inventario_prod_terminado = inventarios[0].id_inventario_prod_terminado
 
+class MermaProduccionForm(FlaskForm):
+    tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='1', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
+    select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
+    select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
+    cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
+    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    motivo = StringField("Motivo", validators=[DataRequired()])
+
+    def _query_lote_materias(self):
+        return db.session.query(
+                    Inventario.id_inventario,
+                    MateriaPrima.nombre,
+                    Inventario.fecha_caducidad,
+                    Inventario.cantidad
+                ).join(MateriaPrima, Inventario.id_materia == MateriaPrima.id_materia)\
+                .join(Proveedor, Inventario.id_proveedor == Proveedor.id_proveedor)\
+                .filter(Inventario.estatus == 1).all()
+
+    def _query_materias(self, id_materia):
+        query = db.session.query(
+                Inventario.id_materia,
+                MateriaPrima.nombre.label('nombre_materia'),
+                func.sum(Inventario.cantidad).label('total_cantidad'),
+                func.count(Inventario.id_inventario).label('total_inventarios'),
+                func.max(Proveedor.nombre).label('nombre_proveedor'),
+                func.max(Inventario.fecha_caducidad).label('fecha_caducidad')
+            ).join(MateriaPrima, Inventario.id_materia == MateriaPrima.id_materia)\
+            .join(Proveedor, Inventario.id_proveedor == Proveedor.id_proveedor)\
+            .filter(Inventario.estatus == 1)\
+            .group_by(Inventario.id_materia, MateriaPrima.nombre)\
+            .order_by(func.max(Inventario.fecha_caducidad).desc())
+            
+        if id_materia is not None:
+            query = query.filter(Inventario.id_materia == id_materia)
+            return query.first()
+        else:
+            return query.all()
+
+    def __init__(self, *args, **kwargs):
+        super(MermaProduccionForm, self).__init__(*args, **kwargs)
+        choices_individual = [(str(row.id_materia), f"{row.nombre_materia}") for row in self._query_materias(None)]
+        choices_lote = [(str(row.id_inventario), f"{row.nombre} - Caducidad: {row.fecha_caducidad} - {row.cantidad} en inventario") for row in self._query_lote_materias()]
+        self.select_materia_individual.choices = choices_individual
+        self.select_materia_lote.choices = choices_lote
+
+    def validate(self):
+        if not super().validate():
+            return False
+
+        if self.tipo_merma_materia.data == "2":
+            id_materia = self.select_materia_individual.data
+            
+            # Obtener la cantidad total correspondiente a la galleta seleccionada y con estatus 1
+            inventario_res = self._query_materias(id_materia)
+            if not inventario_res:
+                flash('No hay inventario disponible para la materia seleccionada.', 'error')
+                return False
+
+            total_cantidad = inventario_res.total_cantidad
+            
+            if self.cantidad_merma_materia.data > total_cantidad:
+                flash('La cantidad de merma es mayor que la cantidad en inventario.', 'error')
+                return False
+            
+            return True
+        return True
+    
+class MermaProduccionView(ModelView):
+    form = MermaProduccionForm
+
+    column_list = ('id_materia', 'cantidad', 'fecha', 'motivo')
+
+    column_formatters = {
+        'id_materia': lambda v, c, m, p: m.materia_prima.nombre if m.materia_prima else "Galleta Desconocida"
+    }
+
+
+    def on_model_change(self, form, model, is_created):
+        if form.tipo_merma_materia.data == "1":
+            model.id_materia = form.select_materia_individual.data
+            model.cantidad = 0
+            inventario_seleccionado = db.session.query(
+                Inventario
+            ).filter(
+                Inventario.id_inventario == form.select_materia_lote.data
+            ).first()
+
+            if inventario_seleccionado:
+                # Asignar los valores del inventario seleccionado al modelo
+                model.id_materia = inventario_seleccionado.id_materia
+                model.cantidad = inventario_seleccionado.cantidad
+                model.fecha = form.fecha.data
+                model.motivo = form.motivo.data
+
+                # Actualizar el estatus y la cantidad del inventario seleccionado a 0
+                inventario_seleccionado.estatus = 0
+                inventario_seleccionado.cantidad = 0
+
+                # Guardar los cambios en la base de datos
+                db.session.commit()
+        elif form.tipo_merma_materia.data == "2":
+            model.id_materia = form.select_materia_individual.data
+            model.cantidad = form.cantidad_merma_materia.data
+            model.fecha = form.fecha.data
+            model.motivo = form.motivo.data
+
+            cantidad_merma = form.cantidad_merma_materia.data
+            id_materia = form.select_materia_individual.data
+
+            # Obtener los registros de inventario correspondientes a la materia prima seleccionada
+            inventario_registros = db.session.query(Inventario).filter(
+                Inventario.id_materia == id_materia,
+                Inventario.estatus == 1
+            ).order_by(asc(Inventario.fecha_caducidad)).all()
+
+            for inventario in inventario_registros:
+                if cantidad_merma <= 0:
+                    break
+                
+                cantidad_restante = cantidad_merma - inventario.cantidad
+                if cantidad_restante >= 0:
+                    # Restar la cantidad de merma del inventario actual
+                    cantidad_merma = cantidad_restante
+                    inventario.cantidad = 0
+                    inventario.estatus = 0 if inventario.cantidad == 0 else 1
+                else:
+                    # Si la cantidad de merma es menor que la del inventario actual,
+                    # simplemente restar la cantidad de merma y salir del bucle
+                    inventario.cantidad -= cantidad_merma
+                    break
+
 
 
 
@@ -752,6 +830,7 @@ def sanitizarDatos(inputString):
 # admin.add_view(InventarioProductoTerminadoView(InventarioProductoTerminado, db.session,menu_icon_type='fa', menu_icon_value='fa-calculator',name="Inventario en venta"))
 # admin.add_view(GalletaView(Galleta, db.session,menu_icon_type='fa', menu_icon_value='fa-cutlery',name="Galletas"))
 # admin.add_view(MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o',name="Merma Galletas"))
+# admin.add_view(MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"))
 
 # Define tus blueprints
 admin_blueprints = [
@@ -765,7 +844,8 @@ admin_blueprints = [
     SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus', name="Solicitud Producción"),
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
-    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas")
+    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
+    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias")
 ]
 # Agrega tus blueprints a Flask-Admin
 for blueprint in admin_blueprints:

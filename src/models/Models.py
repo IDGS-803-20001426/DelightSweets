@@ -57,6 +57,7 @@ class Proveedor(db.Model):
     direccion = db.Column(db.String(200), nullable=False)
     telefono = db.Column(db.String(50), nullable=False)
     nombre_responsable = db.Column(db.String(200), nullable=False)
+    inventariosMateria = relationship('Inventario', backref='proveedor')
 
 class LogGeneral(db.Model):
     __tablename__ = 'logs_general'
@@ -117,6 +118,7 @@ class MermaProdTerminado(db.Model):
     id_inventario_prod_terminado = db.Column(db.SmallInteger, db.ForeignKey('inventario_producto_terminado.id_inventario_prod_terminado'), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
     fecha = db.Column(db.DateTime)
+    motivo = db.Column(db.String(250), nullable=False)
 
     # Definir la relación inversa
     inventario_prod_terminado = relationship("InventarioProductoTerminado", back_populates="mermas")
@@ -176,6 +178,8 @@ class MateriaPrima(db.Model):
     costo = db.Column(db.Double)
     # Relación de muchos a muchos con Receta a través de RecetaMateriaIntermedia
     recetas = db.relationship("Receta", secondary='receta_materia_intermedia', back_populates='materias')
+    inventariosMateria = relationship('Inventario', backref='materia_prima')
+    merma_produccion = relationship('MermaProduccion', backref='materia_prima')
 
     def __repr__(self) -> str:
        return f'{self.nombre}'
@@ -190,10 +194,20 @@ class Inventario(db.Model):
     __tablename__ = 'inventario'
 
     id_inventario = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
-    id_materia = db.Column(db.SmallInteger, nullable=False)
+    id_materia = db.Column(db.SmallInteger, db.ForeignKey('materia_prima.id_materia'), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
     fecha_caducidad = db.Column(db.DateTime, nullable=False)
     estatus = db.Column(db.SmallInteger, nullable=False)
-    id_proveedor = db.Column(db.SmallInteger, nullable=False)
+    id_proveedor = db.Column(db.SmallInteger, db.ForeignKey('proveedor.id_proveedor'), nullable=False)
+
+class MermaProduccion(db.Model):
+    __tablename__ = 'merma_produccion'
+
+    id_merma_produccion = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_materia = db.Column(db.SmallInteger, db.ForeignKey('materia_prima.id_materia'), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    fecha = db.Column(db.DateTime, nullable=False)
+    motivo = db.Column(db.String(250), nullable=False)
+
 
     
