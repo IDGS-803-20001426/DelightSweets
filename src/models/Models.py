@@ -210,4 +210,3 @@ class MermaProduccion(db.Model):
     motivo = db.Column(db.String(250), nullable=False)
 
 
-    

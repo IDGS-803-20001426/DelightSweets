@@ -26,8 +26,11 @@ import MySQLdb
 
 
 
+
+
+
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra 
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -183,6 +186,8 @@ class ProveedorView(ModelView):
         validarFormulario(form_class, ['nombre','direccion', 'nombre_responsable'])
         
         return form_class
+
+
 #Clase Permiso ------------------------------------------------------------------------
 class PermisoView(ModelView):
     def is_accessible(self):
@@ -817,6 +822,60 @@ def sanitizarDatos(inputString):
 
     return cadenaSanitizadda
 
+
+# Define una clase Form personalizada para el formulario de compras
+class CompraForm(FlaskForm):
+    nombre_producto = SelectField('Nombre del Producto', coerce=int, validators=[DataRequired()])
+    cantidad = IntegerField('Cantidad', validators=[DataRequired()])
+    precio_compra = FloatField('Precio de Compra', validators=[DataRequired()])
+    fecha_compra = DateField('Fecha de Compra', validators=[DataRequired()])
+    fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
+    proveedor = SelectField('Proveedor', coerce=int, validators=[DataRequired()])
+    
+    def __init__(self, *args, **kwargs):
+        super(CompraForm, self).__init__(*args, **kwargs)
+        # Consultar los nombres de productos disponibles en la base de datos
+        productos = MateriaPrima.query.all()
+        # Crear una lista de opciones para el campo de selección de productos
+        opciones_productos = [(producto.id_materia, producto.nombre) for producto in productos]
+        # Establecer las opciones en el campo de selección de productos
+        self.nombre_producto.choices = opciones_productos
+
+        # Consultar los proveedores disponibles en la base de datos
+        proveedores = Proveedor.query.all()
+        # Crear una lista de opciones para el campo de selección de proveedores
+        opciones_proveedores = [(proveedor.id_proveedor, proveedor.nombre) for proveedor in proveedores]
+        # Establecer las opciones en el campo de selección de proveedores
+        self.proveedor.choices = opciones_proveedores
+
+        # Establecer la fecha actual como valor predeterminado para la fecha de compra
+        self.fecha_compra.data = datetime.today().date()
+
+    def validate(self):
+        if not super().validate():
+            return False
+        
+        if self.fecha_compra.data < datetime.today().date():
+            flash('La fecha de compra no puede ser anterior a la fecha actual.', 'error')
+            return False
+
+        return True
+
+# Define una clase ModelView personalizada para las compras
+class CompraView(ModelView):
+    form = CompraForm
+    column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
+
+    def on_model_change(self, form, model, is_created):
+        # Obtener el nombre del producto seleccionado en el formulario
+        id_materia = form.nombre_producto.data
+        nombre_producto = MateriaPrima.query.filter_by(id_materia=id_materia).first().nombre
+        
+        # Asignar el nombre del producto a la instancia del modelo Compra
+        model.nombre_producto = nombre_producto
+
+
+
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
 # admin.add_view(RolView(Rol,db.session,category='Adm. Permisos ',name="Rol"))
@@ -845,7 +904,8 @@ admin_blueprints = [
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
     MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
-    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias")
+    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"),
+    CompraView(Compra, db.session, menu_icon_type='fa', menu_icon_value='fa-shopping-cart', name="Compras")
 ]
 # Agrega tus blueprints a Flask-Admin
 for blueprint in admin_blueprints:
@@ -911,6 +971,8 @@ def produccion():
         
         return jsonify({'exito': 'ok'})
     return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
+
+ 
 
 
 class ProduccionAdminView(BaseView):
