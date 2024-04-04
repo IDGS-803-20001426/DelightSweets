@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash
 from models.Models import User,db,Rol,Galleta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
-from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO
 from config import DevelopmentConfig
 
 # PDF
@@ -112,16 +112,19 @@ def home():
 @app.route('/ventas', methods=["GET", "POST"])
 def ventas():
     galletas = GalletaDAO.get_costo_galletas()
+    # print(galletas)
     orden_venta = []
     
     if request.method == "POST":
         datos_orden = request.json.get('orden_venta')
-        
+        # print(datos_orden)
+
         fecha_venta = datetime.now().date()
         hora_venta = datetime.now().time()
         
         try:
             id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
+            descontar_inventario(datos_orden)
             pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
             
             resultado_venta = {
@@ -163,6 +166,39 @@ def insertar_venta(datos_orden, fecha_venta, hora_venta):
     except Exception as ex:
         raise Exception(ex)
 # -------------- INSERT DE VENTA --------------
+
+# -------------- DESCONTAR INVENTARIO --------------
+def descontar_inventario(datos_orden):
+    try:
+        for orden in datos_orden:
+            id_galleta = orden['id_galleta']
+            medida = orden['medida']
+            cantidad = int(orden['cantidad'])
+            gramos_por_pieza = float(orden['gramos_por_pieza'])
+                
+            if medida == 'gramos':
+                cantidad = int(cantidad / gramos_por_pieza)
+            
+            registros_mas_antiguos = InventarioProductoTerminadoDAO.obtener_registros_mas_antiguos(id_galleta)
+
+            for registro in registros_mas_antiguos:
+                if cantidad <= registro['cantidad']:
+                    registro['cantidad'] -= cantidad
+                    if registro['cantidad'] == 0:
+                        registro['estatus'] = 0
+                    InventarioProductoTerminadoDAO.actualizar_registro(registro['id_inventario_prod_terminado'], {'cantidad': registro['cantidad'], 'estatus': registro['estatus']})
+                    break
+                else:
+                    cantidad -= registro['cantidad']
+                    registro['cantidad'] = 0
+                    registro['estatus'] = 0
+                    InventarioProductoTerminadoDAO.actualizar_registro(registro['id_inventario_prod_terminado'], {'cantidad': registro['cantidad'], 'estatus': registro['estatus']})
+                    
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- DESCONTAR INVENTARIO --------------
+
+
 
 
 # -------------- GENERACIÓN DEL PDF --------------

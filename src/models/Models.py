@@ -101,3 +101,20 @@ class DetalleVenta(db.Model):
     total = db.Column(db.Float, nullable=False)
 
     venta = db.relationship('Venta', backref=db.backref('detalles_venta', lazy=True))
+
+class InventarioProductoTerminado(db.Model):
+    __tablename__ = 'inventario_producto_terminado'
+
+    id_inventario_prod_terminado = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_galleta = db.Column(db.SmallInteger, db.ForeignKey('galleta.id_galleta'), nullable=False)
+    fecha_produccion = db.Column(db.DateTime, nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    estatus = db.Column(db.Integer, default=None)
+
+    galleta = db.relationship('Galleta', backref=db.backref('inventario_producto_terminado', lazy=True))
+
+    def __init__(self, id_galleta, fecha_produccion, cantidad, estatus=None):
+        self.id_galleta = id_galleta
+        self.fecha_produccion = fecha_produccion
+        self.cantidad = cantidad
+        self.estatus = estatus

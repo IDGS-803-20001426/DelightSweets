@@ -290,7 +290,8 @@ function agregarCantidad(event, galletaId, galletaNombre, costo_galleta, gramos_
                 nombre: galletaNombre,
                 medida: medida,
                 cantidad: medida === 'piezas' ? cantidad : cantidad,
-                costo: medida === 'piezas' ? cantidad * costo_galleta : (cantidad / gramos_por_galleta) * costo_galleta
+                costo: medida === 'piezas' ? cantidad * costo_galleta : (cantidad / gramos_por_galleta) * costo_galleta,
+                gramos_por_pieza: gramos_por_galleta
             };
             cantidadOrden.push(nuevaOrden);
         }
@@ -380,6 +381,7 @@ function confirmarOrden(galletaId) {
                     ordenExistente.medida === nuevaOrden.medida) {
                     ordenExistente.cantidad += nuevaOrden.cantidad;
                     ordenExistente.costo += nuevaOrden.costo;
+                    ordenExistente.gramos_por_pieza = nuevaOrden.gramos_por_pieza;
                     encontrado = true;
                     break;
                 }
