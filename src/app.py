@@ -823,6 +823,7 @@ def sanitizarDatos(inputString):
     return cadenaSanitizadda
 
 
+
 # Define una clase Form personalizada para el formulario de compras
 class CompraForm(FlaskForm):
     nombre_producto = SelectField('Nombre del Producto', coerce=int, validators=[DataRequired()])
@@ -830,36 +831,19 @@ class CompraForm(FlaskForm):
     precio_compra = FloatField('Precio de Compra', validators=[DataRequired()])
     fecha_compra = DateField('Fecha de Compra', validators=[DataRequired()])
     fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
-    proveedor = SelectField('Proveedor', coerce=int, validators=[DataRequired()])
-    
+    nombre_proveedor = StringField('Nombre del Proveedor', validators=[DataRequired()])
+
     def __init__(self, *args, **kwargs):
         super(CompraForm, self).__init__(*args, **kwargs)
         # Consultar los nombres de productos disponibles en la base de datos
         productos = MateriaPrima.query.all()
-        # Crear una lista de opciones para el campo de selección de productos
-        opciones_productos = [(producto.id_materia, producto.nombre) for producto in productos]
-        # Establecer las opciones en el campo de selección de productos
-        self.nombre_producto.choices = opciones_productos
-
-        # Consultar los proveedores disponibles en la base de datos
-        proveedores = Proveedor.query.all()
-        # Crear una lista de opciones para el campo de selección de proveedores
-        opciones_proveedores = [(proveedor.id_proveedor, proveedor.nombre) for proveedor in proveedores]
-        # Establecer las opciones en el campo de selección de proveedores
-        self.proveedor.choices = opciones_proveedores
-
+        # Crear una lista de opciones para el campo de selección
+        opciones = [(producto.id_materia, producto.nombre) for producto in productos]
+        # Establecer las opciones en el campo de selección
+        self.nombre_producto.choices = opciones 
+        
         # Establecer la fecha actual como valor predeterminado para la fecha de compra
         self.fecha_compra.data = datetime.today().date()
-
-    def validate(self):
-        if not super().validate():
-            return False
-        
-        if self.fecha_compra.data < datetime.today().date():
-            flash('La fecha de compra no puede ser anterior a la fecha actual.', 'error')
-            return False
-
-        return True
 
 # Define una clase ModelView personalizada para las compras
 class CompraView(ModelView):
@@ -868,13 +852,11 @@ class CompraView(ModelView):
 
     def on_model_change(self, form, model, is_created):
         # Obtener el nombre del producto seleccionado en el formulario
-        id_materia = form.nombre_producto.data
-        nombre_producto = MateriaPrima.query.filter_by(id_materia=id_materia).first().nombre
+        id_producto = form.nombre_producto.data
+        nombre_producto = MateriaPrima.query.filter_by(id_materia=id_producto).first().nombre
         
         # Asignar el nombre del producto a la instancia del modelo Compra
         model.nombre_producto = nombre_producto
-
-
 
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
