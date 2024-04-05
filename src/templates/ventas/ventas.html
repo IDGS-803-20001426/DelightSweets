@@ -17,19 +17,25 @@
                             <img src="{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
                         </div>
                         <div class="info_galleta">
-                            <!-- <p>ID: {{ galleta.id_galleta }}</p> -->
                             <p>{{ galleta.nombre }}</p>  
                             <div class="d-grid gap-2">
-                                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}')">AGREGAR</button>
-
-                                <!-- <button class="btn btn-primary" type="button"   data-bs-toggle="modal" data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">AGREGAR</button> -->
+                                <button 
+                                class="btn btn-primary" 
+                                type="button" 
+                                data-bs-toggle="modal" 
+                                {% if galleta.disponible|int <= 0 %}  
+                                onclick="sinDisponible('{{ galleta.nombre }}')"
+                                {% else %}
+                                data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" 
+                                onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}','{{ galleta.disponible }}','{{ galleta.nombre }}')"
+                                {% endif %} >AGREGAR</button>
                             </div>
-                            <!-- MODAL COMENTADO -->
+                            <!-- MODAL -->
                             <div class="modal fade" id="staticBackdrop{{ galleta.id_galleta }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="staticBackdropLabel">{{ galleta.nombre }} disponibles: {{ galleta.disponible }} </h5>
+                                    <div class="modal-header_{{ galleta.id_galleta }}">
+                                        <h5 class="modal-title_{{ galleta.id_galleta }}" id="staticBackdropLabel">{{ galleta.nombre }} disponibles: {{ galleta.disponible }} </h5>
                                     </div>
                                     <div class="modal-body">
                                         <div class="row">
@@ -45,14 +51,9 @@
                                                     </div>
                                                     <div id="cantidad_button_{{ galleta.id_galleta }}" class="mb-3" style="display: none;">
                                                         <label for="cantidad_{{ galleta.id_galleta }}" class="form-label">Cantidad:</label>
-                                                        <!-- <input type="text" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="validateInput(this, {{galleta.gramos_por_pieza}})"> -->
                                                         <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="handleInputChange(this)" onblur="validateAndRoundQuantity(this, {{galleta.gramos_por_pieza}}, '{{ galleta.nombre }}')">
-
-
                                                         <span id="mensaje_error_{{ galleta.id_galleta }}" class="text-danger" style="display: none;"></span>
-                                                        <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}')">Añadir</button>
-                                                        <!-- <button onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}')">Añadir</button> -->
-
+                                                        <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}','{{ galleta.disponible }}')">Añadir</button>
                                                     </div>
                                                 </form>
                                             </div>                                        
@@ -72,43 +73,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- MODAL COMENTADO-->
-                            
-                            <!-- MODAL -->
-                            <!-- <div class="modal fade" id="staticBackdrop{{ galleta.id_galleta }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="staticBackdropLabel"> ¿Cómo quieres tu {{ galleta.nombre }}?</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <form method="POST" action="{{ url_for('ventas') }}">
-                                                <input type="hidden" id="id_galleta" name="id_galleta" value="{{ galleta.id_galleta }}">
-                                                <div class="mb-3">
-                                                    <label for="nombre">Galleta</label>
-                                                    <input type="text" id="nombre" name="nombre" value="{{ galleta.nombre }}" readonly>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="medida">Medida</label>
-                                                    <select id="medida" name="medida">
-                                                        <option value="gramos">Gramos</option>
-                                                        <option value="piezas">Piezas</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="cantidad">Cantidad</label>
-                                                    <input type="number" id="cantidad" name="cantidad" min="1">
-                                                </div>
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn btn-primary">Confirmar Orden</button>
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar Orden</button>
-                                            </form>
-                                        </div>                                    
-                                    </div>
-                                </div>
-                            </div> -->
-                            <!-- MODAL -->
+                            <!-- MODAL-->
                         </div>
                     </div>
                 </div>
@@ -118,10 +83,7 @@
     </div>
     <div class="col-sm-6 col-lg-4">
         <div class="ventas">
-            <div class="ventas_orden">
-
-            </div>
-            
+            <div class="ventas_orden"></div>            
             <div class="boton_vender">
                 <button type="button" class="btn btn-primary w-100"
                 onclick="enviarDatosLocalStorageAlServidor()"

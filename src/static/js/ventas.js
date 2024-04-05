@@ -51,7 +51,7 @@ function enviarDatosLocalStorageAlServidor() {
     })
     .catch(function(error) {
         console.error('Error:', error);
-        showAlert('error', 'Error al enviar los datos del localStorage al servidor');
+        showAlert('danger', 'Error al registrar la venta, intente nuevamente');
     });
 }
 
@@ -74,6 +74,9 @@ function showAlert(type, message) {
 
     var container = document.getElementById('alert-container');
     container.appendChild(alertDiv);
+    setTimeout(function() {
+        alertDiv.remove();
+    }, 2000);
 }
 
 function generarOrdenCompra() {
@@ -257,14 +260,55 @@ function validateAndRoundQuantity(input, gramos_por_pieza, nombre_galleta) {
     boton.disabled = false;
 }
 
-function agregarCantidad(event, galletaId, galletaNombre, costo_galleta, gramos_por_galleta) {
+function agregarCantidad(event, galletaId, galletaNombre, costo_galleta, gramos_por_galleta, disponible) {
     event.preventDefault();
+    
+    var ordenVenta = JSON.parse(localStorage.getItem('orden_venta'));
+    var cantidadOrden = JSON.parse(localStorage.getItem('cantidad_orden'));
+
+    var galletasTotales = 0;
+
+    if (cantidadOrden && cantidadOrden.length > 0) {
+        cantidadOrden.forEach(function(item) {
+            if (item.id_galleta === galletaId) {
+                if (item.medida === "piezas") {
+                    galletasTotales += item.cantidad;
+                } else if (item.medida === "gramos") {
+                    galletasTotales += item.cantidad / gramos_por_galleta;
+                }
+            }
+        });
+    }
+
+    if (ordenVenta && ordenVenta.length > 0) {
+        ordenVenta.forEach(function(item) {
+            if (item.id_galleta === galletaId) {
+                if (item.medida === "piezas") {
+                    galletasTotales += item.cantidad;
+                } else if (item.medida === "gramos") {
+                    galletasTotales += item.cantidad / gramos_por_galleta;
+                }
+            }
+        });
+    }
 
     var cantidadInput = document.getElementById('cantidad_' + galletaId);
-    var cantidad = parseInt(cantidadInput.value);
+    var cantidadSuma = parseInt(cantidadInput.value);
 
     var medidaSelect = document.getElementById('medida_' + galletaId);
     var medida = medidaSelect.value;
+
+    if (medida === "gramos") {
+        cantidadSuma = cantidadSuma / gramos_por_galleta;
+    }
+
+    if (galletasTotales + cantidadSuma > disponible) {
+        alert("No puedes ingresar " + cantidadSuma + "galletas ya que superas el límite del producto disponible.");
+        return;
+    }
+
+    var cantidadInput = document.getElementById('cantidad_' + galletaId);
+    var cantidad = parseInt(cantidadInput.value);
 
     if (medida && !isNaN(cantidad) && cantidad > 0) {
         var cantidadOrden = JSON.parse(localStorage.getItem('cantidad_orden')) || [];
@@ -405,8 +449,34 @@ function confirmarOrden(galletaId) {
     generarOrdenCompra();
 }
 
-function habilitarConfirmarOrden(galletaId) {
+function habilitarConfirmarOrden(galletaId, disponible,nombre) {
     var botonConfirmarOrden = document.getElementById('boton_confirmar_orden_' + galletaId);
     botonConfirmarOrden.disabled = true;
+
+    var ordenVenta = JSON.parse(localStorage.getItem('orden_venta'));
+    var galletasTotales = 0;
+
+    if (ordenVenta && ordenVenta.length > 0) {
+        ordenVenta.forEach(function(item) {
+            if (item.id_galleta === galletaId) {
+                if (item.medida === "piezas") {
+                    galletasTotales += item.cantidad;
+                } else if (item.medida === "gramos") {
+                    galletasTotales += item.cantidad / item.gramos_por_pieza;
+                }
+            }
+        });
+    }
+
+    if (galletasTotales !== 0){
+        var disponibleActualizado = disponible - galletasTotales;
+        var modalHeader = document.querySelector('.modal-title_' + galletaId );
+        modalHeader.textContent = nombre +" Disponibles: " + disponibleActualizado;
+    }
+
+}
+
+function sinDisponible(nombre){
+    showAlert('warning', 'No hay ' + nombre + ' disponibles por el momento');
 }
 
