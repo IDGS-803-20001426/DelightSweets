@@ -883,10 +883,17 @@ class CompraView(ModelView):
         )
         # Agregar el nuevo registro a la sesión
         db.session.add(inventario)
+
+        # Obtener el objeto de materia prima correspondiente al producto comprado
+        materia_prima = MateriaPrima.query.get(id_producto)
+        # Actualizar el costo de la materia prima con el precio de compra
+        materia_prima.costo = form.precio_compra.data
+
         # Confirmar los cambios en la base de datos
         db.session.commit()
         # Mensaje de confirmación
-        flash('Se ha registrado la compra y actualizado el inventario', 'success')
+        flash('Se ha registrado la compra y actualizado el inventario y el costo de materia prima', 'success')
+
 
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
