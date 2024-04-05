@@ -873,6 +873,21 @@ class CompraView(ModelView):
         # Asignar el nombre del proveedor a la instancia del modelo Compra
         model.nombre_proveedor = nombre_proveedor
 
+        # Crear un nuevo registro en la tabla Inventario
+        inventario = Inventario(
+            id_materia=id_producto,
+            cantidad=form.cantidad.data,
+            fecha_caducidad=form.fecha_caducidad.data,
+            estatus=1,  # El valor de estatus es 1 según lo requerido
+            id_proveedor=id_proveedor
+        )
+        # Agregar el nuevo registro a la sesión
+        db.session.add(inventario)
+        # Confirmar los cambios en la base de datos
+        db.session.commit()
+        # Mensaje de confirmación
+        flash('Se ha registrado la compra y actualizado el inventario', 'success')
+
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
 # admin.add_view(RolView(Rol,db.session,category='Adm. Permisos ',name="Rol"))
