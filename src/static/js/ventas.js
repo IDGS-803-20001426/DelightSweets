@@ -10,6 +10,9 @@ function enviarDatosLocalStorageAlServidor() {
         return;
     }
 
+    var botonGuardarVenta = document.querySelector('.boton_vender button');
+    botonGuardarVenta.disabled = true;
+
     var ordenVenta = JSON.parse(localStorage.getItem('orden_venta')) || [];
     console.log('Datos del Local Storage:', ordenVenta);
 
@@ -112,7 +115,7 @@ function generarOrdenCompra() {
             var divCantidad = document.createElement('div');
             divCantidad.classList.add('col-sm-6', 'col-lg-3');
             var cantidadLabel = document.createElement('label');
-            cantidadLabel.textContent = (orden.medida === 'piezas' || orden.medida === 'gramos')? orden.cantidad + ' ' + orden.medida : orden.cantidad + ' Paquete de ' + orden.medida + 'gramos' ;
+            cantidadLabel.textContent = (orden.medida === 'piezas' || orden.medida === 'gramos')? orden.cantidad + ' ' + orden.medida : orden.cantidad + ' Paquete de ' + orden.medida + ' gramos' ;
             divCantidad.appendChild(cantidadLabel);
             divRow.appendChild(divCantidad);
             

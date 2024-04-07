@@ -148,6 +148,7 @@ def ventas():
 # -------------- INSERT DE VENTA --------------
 def insertar_venta(datos_orden, fecha_venta, hora_venta):
     try:
+
         subtotal = sum(galleta['costo'] for galleta in datos_orden)
         impuesto = subtotal * 0.16
         total = subtotal + impuesto
@@ -160,7 +161,12 @@ def insertar_venta(datos_orden, fecha_venta, hora_venta):
             cantidad = galleta['cantidad']
             total_detalle = round(galleta['costo'], 2)
             
-            DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, medida, cantidad, total_detalle)
+            if medida == 'gramos' or medida == 'piezas':
+                DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, medida, cantidad, total_detalle)
+            else:
+                cantidad_en_gramos = int(medida) * cantidad if medida.isdigit() else 0
+                DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, 'gramos', cantidad_en_gramos, total_detalle)
+
         
         return id_venta  
     except Exception as ex:
@@ -178,7 +184,12 @@ def descontar_inventario(datos_orden):
                 
             if medida == 'gramos':
                 cantidad = int(cantidad / gramos_por_pieza)
-            
+            elif medida == 'piezas':
+                pass
+            else:
+                medida_entero = int(medida)
+                cantidad = int(medida_entero * cantidad / gramos_por_pieza)
+
             registros_mas_antiguos = InventarioProductoTerminadoDAO.obtener_registros_mas_antiguos(id_galleta)
 
             for registro in registros_mas_antiguos:
@@ -197,9 +208,6 @@ def descontar_inventario(datos_orden):
     except Exception as ex:
         raise Exception(ex)
 # -------------- DESCONTAR INVENTARIO --------------
-
-
-
 
 # -------------- GENERACIÓN DEL PDF --------------
 def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
@@ -223,7 +231,7 @@ def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
     logo_path = os.path.join(os.getcwd(), 'static', 'img', 'logo.png')
     if os.path.exists(logo_path):
         logo = Image(logo_path, width=100, height=100)
-        logo.hAlign = 'LEFT'  # Alineación a la izquierda
+        logo.hAlign = 'LEFT'
         elements.append(logo)
         elements.append(Spacer(1, 20))
 
@@ -232,7 +240,10 @@ def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
 
     data = [["Producto", "Cantidad", "Medida", "Costo"]]
     for galleta in orden_venta:
-        data.append([galleta['nombre'], str(galleta['cantidad']), galleta['medida'], f"${round(galleta['costo'], 2)}"])
+        medida_texto = galleta['medida']
+        if galleta['medida'] not in ['piezas', 'gramos']:
+            medida_texto = f"Paquete de {galleta['medida']} gramos"
+        data.append([galleta['nombre'], str(galleta['cantidad']), medida_texto, f"${round(galleta['costo'], 2)}"])
     table = Table(data)
     table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
