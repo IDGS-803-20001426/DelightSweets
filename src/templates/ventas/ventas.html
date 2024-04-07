@@ -27,7 +27,7 @@
                                 onclick="sinDisponible('{{ galleta.nombre }}')"
                                 {% else %}
                                 data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" 
-                                onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}','{{ galleta.disponible }}','{{ galleta.nombre }}')"
+                                onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}','{{ galleta.disponible }}','{{ galleta.nombre }}','{{galleta.gramos_por_pieza}}')"
                                 {% endif %} >AGREGAR</button>
                             </div>
                             <!-- MODAL -->
@@ -42,16 +42,10 @@
                                             <div class="col-sm-6">
                                                 <form id="form_{{ galleta.id_galleta }}">
                                                     <div class="mb-3">
-                                                        <label for="medida_{{ galleta.id_galleta }}" class="form-label">Selecciona la medida:</label>
-                                                        <select class="form-select" id="medida_{{ galleta.id_galleta }}" onchange="showInputAndButton(this)">
-                                                            <option value="">Selecciona una medida</option>
-                                                            <option value="gramos">Gramos</option>
-                                                            <option value="piezas">Piezas</option>
-                                                        </select>
                                                     </div>
                                                     <div id="cantidad_button_{{ galleta.id_galleta }}" class="mb-3" style="display: none;">
                                                         <label for="cantidad_{{ galleta.id_galleta }}" class="form-label">Cantidad:</label>
-                                                        <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="handleInputChange(this)" onblur="validateAndRoundQuantity(this, {{galleta.gramos_por_pieza}}, '{{ galleta.nombre }}')">
+                                                        <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="handleInputChange(this)" onblur="validateAndRoundQuantity(this, '{{galleta.gramos_por_pieza}}', '{{ galleta.nombre }}')">
                                                         <span id="mensaje_error_{{ galleta.id_galleta }}" class="text-danger" style="display: none;"></span>
                                                         <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}','{{ galleta.disponible }}')">Añadir</button>
                                                     </div>

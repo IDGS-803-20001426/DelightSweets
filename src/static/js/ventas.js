@@ -112,7 +112,7 @@ function generarOrdenCompra() {
             var divCantidad = document.createElement('div');
             divCantidad.classList.add('col-sm-6', 'col-lg-3');
             var cantidadLabel = document.createElement('label');
-            cantidadLabel.textContent = orden.cantidad + ' ' + orden.medida;
+            cantidadLabel.textContent = (orden.medida === 'piezas' || orden.medida === 'gramos')? orden.cantidad + ' ' + orden.medida : orden.cantidad + ' Paquete de ' + orden.medida + 'gramos' ;
             divCantidad.appendChild(cantidadLabel);
             divRow.appendChild(divCantidad);
             
@@ -182,7 +182,7 @@ function showInputAndButton(select) {
     mensajeError.textContent = "";
     mensajeError.style.display = 'none';
 
-    if (select.value === 'gramos' || select.value === 'piezas') {
+    if (select.value) {
         cantidadButtonDiv.style.display = 'block';
         input.value = '';
         boton.disabled = true;
@@ -199,6 +199,13 @@ function handleInputChange(input) {
     var medidaSelect = document.getElementById('medida_' + id);
     var boton = document.getElementById('boton_' + id);
     var mensajeError = document.getElementById('mensaje_error_' + id);
+
+    if (cantidad.includes('.')) {
+        mensajeError.textContent = "Solo se aceptan números enteros en este campo.";
+        mensajeError.style.display = 'block';
+        boton.disabled = true;
+        return;
+    }
 
     if (isNaN(cantidad) || cantidad === '') {
         mensajeError.textContent = "Solo puedes ingresar números en este campo.";
@@ -227,27 +234,29 @@ function handleInputChange(input) {
 
 function validateAndRoundQuantity(input, gramos_por_pieza, nombre_galleta) {
     var id = input.id.split('_').pop();
-    var cantidad = parseInt(input.value);
+    var cantidad = input.value.trim(); 
     var medidaSelect = document.getElementById('medida_' + id);
     var mensajeError = document.getElementById('mensaje_error_' + id);
     var boton = document.getElementById('boton_' + id);
     var gramosPorPieza = parseFloat(gramos_por_pieza);
 
-    if (isNaN(cantidad)) {
-        mensajeError.textContent = "Solo puedes ingresar números en este campo.";
+    if (isNaN(cantidad) || cantidad.includes('.')) {
+        mensajeError.textContent = "Solo se aceptan números enteros en este campo.";
         mensajeError.style.display = 'block';
         boton.disabled = true;
         return;
     }
 
+    cantidad = parseInt(cantidad);
+
     if (medidaSelect.value === 'gramos') {
         if (cantidad % gramosPorPieza !== 0) {
             var cantidadRedondeada = Math.round(cantidad / gramosPorPieza) * gramosPorPieza;
-            
+
             if (cantidadRedondeada === 0) {
                 cantidadRedondeada = gramosPorPieza;
             }
-            
+
             mensajeError.textContent = "No es posible vender " + cantidad + " gramos de esta galleta. La galleta de " + nombre_galleta + " pesa " + gramosPorPieza + " gramos por cada pieza.";
             mensajeError.style.display = 'block';
             input.value = cantidadRedondeada;
@@ -327,14 +336,33 @@ function agregarCantidad(event, galletaId, galletaNombre, costo_galleta, gramos_
             } else if (medida === 'gramos') {
                 cantidadOrden[foundIndex].cantidad += cantidad;
                 cantidadOrden[foundIndex].costo += (cantidad / gramos_por_galleta) * costo_galleta;
+            } else {
+                
+                var medidaEntera = parseInt(medida); 
+                var cantidadPiezas = medidaEntera / gramos_por_galleta; 
+                var costoPaquete = cantidadPiezas * costo_galleta * cantidad; 
+                cantidadOrden[foundIndex].cantidad += cantidad; 
+                cantidadOrden[foundIndex].costo += costoPaquete; 
             }
         } else {
+            
+            var nuevoCosto;
+            if (medida === 'piezas') {
+                nuevoCosto = cantidad * costo_galleta;
+            } else if (medida === 'gramos') {
+                nuevoCosto = (cantidad / gramos_por_galleta) * costo_galleta;
+            } else {
+                
+                var medidaEntera = parseInt(medida); 
+                var cantidadPiezas = medidaEntera / gramos_por_galleta; 
+                nuevoCosto = cantidadPiezas * costo_galleta * cantidad; 
+            }
             var nuevaOrden = {
                 id_galleta: galletaId,
                 nombre: galletaNombre,
                 medida: medida,
-                cantidad: medida === 'piezas' ? cantidad : cantidad,
-                costo: medida === 'piezas' ? cantidad * costo_galleta : (cantidad / gramos_por_galleta) * costo_galleta,
+                cantidad: cantidad,
+                costo: nuevoCosto,
                 gramos_por_pieza: gramos_por_galleta
             };
             cantidadOrden.push(nuevaOrden);
@@ -369,7 +397,7 @@ function mostrarCantidades(galletaId) {
     } else {
         cantidadOrden.forEach(function(orden) {
             var div = document.createElement('div');
-            div.innerHTML = `<p>Cantidad: ${orden.cantidad} ${orden.medida}, Costo: $${orden.costo.toFixed(2)}</p>`;
+            div.innerHTML = (orden.medida === 'piezas' || orden.medida === 'gramos')? `<p>Cantidad: ${orden.cantidad} ${orden.medida}, Costo: $${orden.costo.toFixed(2)}</p>`: `<p>Cantidad: ${orden.cantidad}, Paquete de ${orden.medida} gramos, Costo: $${orden.costo.toFixed(2)}</p>`;
             container.appendChild(div);
         });
     }
@@ -449,7 +477,10 @@ function confirmarOrden(galletaId) {
     generarOrdenCompra();
 }
 
-function habilitarConfirmarOrden(galletaId, disponible,nombre) {
+function habilitarConfirmarOrden(galletaId, disponible, nombre, gramosPorPieza) {
+    console.log('id_galleta: ' + galletaId + '\n' + 'disponible: ' + disponible + '\n' + 'nombre: ' + nombre + '\n' + 'gramos_por_pieza: ' + gramosPorPieza);
+
+    localStorage.removeItem('cantidad_orden');
     var botonConfirmarOrden = document.getElementById('boton_confirmar_orden_' + galletaId);
     botonConfirmarOrden.disabled = true;
 
@@ -457,7 +488,7 @@ function habilitarConfirmarOrden(galletaId, disponible,nombre) {
     var galletasTotales = 0;
 
     if (ordenVenta && ordenVenta.length > 0) {
-        ordenVenta.forEach(function(item) {
+        ordenVenta.forEach(function (item) {
             if (item.id_galleta === galletaId) {
                 if (item.medida === "piezas") {
                     galletasTotales += item.cantidad;
@@ -468,13 +499,70 @@ function habilitarConfirmarOrden(galletaId, disponible,nombre) {
         });
     }
 
-    if (galletasTotales !== 0){
+    if (galletasTotales !== 0) {
         var disponibleActualizado = disponible - galletasTotales;
-        var modalHeader = document.querySelector('.modal-title_' + galletaId );
-        modalHeader.textContent = nombre +" Disponibles: " + disponibleActualizado;
+        var modalHeader = document.querySelector('.modal-title_' + galletaId);
+        modalHeader.textContent = nombre + " Disponibles: " + disponibleActualizado;
     }
 
+    var selectExistente = document.getElementById("medida_" + galletaId);
+    if (!selectExistente) {
+        var selectMedida = document.createElement("select");
+        selectMedida.className = "form-select";
+        selectMedida.id = "medida_" + galletaId;
+        selectMedida.setAttribute("onchange", "showInputAndButton(this)");
+
+        var optionSelecciona = document.createElement("option");
+        optionSelecciona.value = "";
+        optionSelecciona.text = "Selecciona una medida";
+        selectMedida.appendChild(optionSelecciona);
+
+        var optionPiezas = document.createElement("option");
+        optionPiezas.value = "piezas";
+        optionPiezas.text = "Piezas";
+        selectMedida.appendChild(optionPiezas);
+
+        var optionGramos = document.createElement("option");
+        optionGramos.value = "gramos";
+        optionGramos.text = "Gramos";
+        selectMedida.appendChild(optionGramos);
+
+        var gramosPorPiezaInt = parseInt(gramosPorPieza);
+
+        var mayorA700 = 0;
+        for (var i = gramosPorPiezaInt; i < 700; i += gramosPorPiezaInt) {
+            mayorA700 = i;
+        }
+
+        if (mayorA700 < 700) {
+            mayorA700 += gramosPorPiezaInt;
+        }
+        var optionPaquete1 = document.createElement("option");
+        optionPaquete1.value = mayorA700;
+        optionPaquete1.text = "Paquete de " + mayorA700 + " gramos";
+        selectMedida.appendChild(optionPaquete1);
+
+        var mayorA1000 = 0;
+        for (var i = gramosPorPiezaInt; i < 1000; i += gramosPorPiezaInt) {
+            mayorA1000 = i;
+        }
+
+        if (mayorA1000 < 1000) {
+            mayorA1000 += gramosPorPiezaInt;
+        }
+        var optionPaquete2 = document.createElement("option");
+        optionPaquete2.value = mayorA1000;
+        optionPaquete2.text = "Paquete de " + mayorA1000 + " gramos";
+        selectMedida.appendChild(optionPaquete2);
+
+        var form = document.getElementById("form_" + galletaId);
+        var firstDiv = form.querySelector('.mb-3');
+        firstDiv.appendChild(document.createTextNode("Elige una opción"));
+        firstDiv.appendChild(selectMedida);
+    }
 }
+
+
 
 function sinDisponible(nombre){
     showAlert('warning', 'No hay ' + nombre + ' disponibles por el momento');
