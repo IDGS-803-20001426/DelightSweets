@@ -536,7 +536,7 @@ class RecetaView(ModelView):
         db.session.commit()
 
 class MermaProdTerminadoForm(FlaskForm):
-    tipo_merma = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='1', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
+    tipo_merma = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='2', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
     select_galleta_individual = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     select_galleta_lote = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma = IntegerField('Cantidad', validators=[NumberRange(min=1)], default=1)
@@ -671,7 +671,7 @@ class MermaProdTerminadoView(ModelView):
                 model.id_inventario_prod_terminado = inventarios[0].id_inventario_prod_terminado
 
 class MermaProduccionForm(FlaskForm):
-    tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='1', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
+    tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='2', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
     select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
@@ -845,7 +845,7 @@ admin_blueprints = [
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
     MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
-    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias")
+    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias", menu_icon_value='fa-plus-square-o')
 ]
 # Agrega tus blueprints a Flask-Admin
 for blueprint in admin_blueprints:
