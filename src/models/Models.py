@@ -118,3 +118,52 @@ class InventarioProductoTerminado(db.Model):
         self.fecha_produccion = fecha_produccion
         self.cantidad = cantidad
         self.estatus = estatus
+
+class CorteCaja(db.Model):
+    __tablename__ = 'corte_caja'
+
+    id_corte_caja = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    fecha_de_inicio = db.Column(db.Date, nullable=True)
+    hora_inicio = db.Column(db.Time, nullable=True)
+    fecha_de_termino = db.Column(db.Date, nullable=True)
+    hora_termino = db.Column(db.Time, nullable=True)
+    estatus = db.Column(db.SmallInteger, nullable=False)
+    id_usuario = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario):
+        self.fecha_de_inicio = fecha_de_inicio
+        self.hora_inicio = hora_inicio
+        self.fecha_de_termino = fecha_de_termino
+        self.hora_termino = hora_termino
+        self.estatus = estatus
+        self.id_usuario = id_usuario
+
+class CorteCajaVenta(db.Model):
+    __tablename__ = 'corte_caja_venta'
+
+    id_corte_caja_venta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    id_venta = db.Column(db.SmallInteger, nullable=False)
+    id_corte_caja = db.Column(db.SmallInteger, nullable=False)
+    estatus = db.Column(db.SmallInteger, nullable=True)
+
+    def __init__(self, id_venta, id_corte_caja, estatus):
+        self.id_venta = id_venta
+        self.id_corte_caja = id_corte_caja
+        self.estatus = estatus
+
+class Retiro(db.Model):
+    __tablename__ = 'retiro'
+
+    id_retiro = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
+    fecha_hora = db.Column(db.DateTime, nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    motivo = db.Column(db.String(200), nullable=False)
+    id_corte_caja = db.Column(db.SmallInteger, nullable=False)
+    id_usuario = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, fecha_hora, monto, motivo, id_corte_caja, id_usuario):
+        self.fecha_hora = fecha_hora
+        self.monto = monto
+        self.motivo = motivo
+        self.id_corte_caja = id_corte_caja
+        self.id_usuario = id_usuario

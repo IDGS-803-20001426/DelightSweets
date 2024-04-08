@@ -1,4 +1,4 @@
-from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado
+from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado, CorteCaja, CorteCajaVenta, Retiro
 from sqlalchemy import func
 
 class GalletaDAO:
@@ -98,6 +98,17 @@ class VentaDAO:
         except Exception as ex:
             db.session.rollback()
             raise Exception(ex)
+        
+    @classmethod
+    def obtener_total_por_id_venta(cls, id_venta):
+        try:
+            venta = Venta.query.filter_by(id_venta=id_venta).first()
+            if venta:
+                return venta.total
+            else:
+                raise ValueError("No se encontró una venta con el id especificado.")
+        except Exception as ex:
+            raise Exception(ex)
 
 class DetalleVentaDAO:
 
@@ -115,4 +126,128 @@ class DetalleVentaDAO:
             db.session.commit()
         except Exception as ex:
             db.session.rollback()
+            raise Exception(ex)
+        
+class CorteCajaDAO:
+    
+    @classmethod
+    def insertar_corte_caja(cls, fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario):
+        try:
+            nuevo_corte_caja = CorteCaja(
+                fecha_de_inicio=fecha_de_inicio,
+                hora_inicio=hora_inicio,
+                fecha_de_termino=fecha_de_termino,
+                hora_termino=hora_termino,
+                estatus=estatus,
+                id_usuario=id_usuario
+            )
+            db.session.add(nuevo_corte_caja)
+            db.session.commit()
+            return nuevo_corte_caja.id_corte_caja
+        except Exception as ex:
+            db.session.rollback()
+            raise Exception(ex)
+    
+    @classmethod
+    def consultar_primer_registro_descendente(cls):
+        try:
+            primer_registro = CorteCaja.query.order_by(CorteCaja.id_corte_caja.desc()).first()
+            if primer_registro:
+                resultado = {
+                    'id_corte_caja': primer_registro.id_corte_caja,
+                    'fecha_de_inicio': primer_registro.fecha_de_inicio.strftime("%Y-%m-%d") if primer_registro.fecha_de_inicio is not None else None,
+                    'hora_inicio': primer_registro.hora_inicio.strftime("%H:%M:%S") if primer_registro.hora_inicio is not None else None,
+                    'fecha_de_termino': primer_registro.fecha_de_termino.strftime("%Y-%m-%d") if primer_registro.fecha_de_termino is not None else None,
+                    'hora_termino': primer_registro.hora_termino.strftime("%H:%M:%S") if primer_registro.hora_termino is not None else None,
+                    'estatus': primer_registro.estatus,
+                    'id_usuario': primer_registro.id_usuario
+                }
+                return resultado
+            else:
+                return None
+        except Exception as ex:
+            raise Exception(ex)
+
+
+class CorteCajaVentaDAO:
+
+    @classmethod
+    def insertar_corte_caja_venta(cls, id_venta, id_corte_caja, estatus):
+        try:
+            nuevo_corte_caja_venta = CorteCajaVenta(
+                id_venta=id_venta,
+                id_corte_caja=id_corte_caja,
+                estatus=estatus
+            )
+            print(nuevo_corte_caja_venta)
+            db.session.add(nuevo_corte_caja_venta)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            raise Exception(ex)
+
+    @classmethod
+    def consultar_por_id_corte_caja(cls, id_corte_caja):
+        try:
+            corte_caja_ventas = CorteCajaVenta.query.filter_by(id_corte_caja=id_corte_caja, estatus=1).all()
+            resultados = []
+            for corte_caja_venta in corte_caja_ventas:
+                resultado = {
+                    'id_corte_caja_venta': corte_caja_venta.id_corte_caja_venta,
+                    'id_venta': corte_caja_venta.id_venta,
+                    'id_corte_caja': corte_caja_venta.id_corte_caja,
+                    'estatus': corte_caja_venta.estatus
+                }
+                resultados.append(resultado)
+            return resultados
+        except Exception as ex:
+            raise Exception(ex)
+        
+    @classmethod
+    def actualizar_estatus(cls, id_corte_caja):
+        try:
+            corte_caja_ventas = CorteCajaVenta.query.filter_by(id_corte_caja=id_corte_caja, estatus=1).all()
+
+            for corte_caja_venta in corte_caja_ventas:
+                corte_caja_venta.estatus = 0
+                db.session.commit()
+
+        except Exception as ex:
+            db.session.rollback()
+
+class RetiroDAO:
+
+    @classmethod
+    def insertar_retiro(cls, fecha_hora, monto, motivo, id_corte_caja, id_usuario):
+        try:
+            nuevo_retiro = Retiro(
+                fecha_hora=fecha_hora,
+                monto=monto,
+                motivo=motivo,
+                id_corte_caja=id_corte_caja,
+                id_usuario=id_usuario
+            )
+            db.session.add(nuevo_retiro)
+            db.session.commit()
+        except Exception as ex:
+            db.session.rollback()
+            raise Exception(ex)
+
+    @classmethod
+    def consultar_todos(cls):
+        try:
+            retiros = Retiro.query.all()
+            resultados = []
+            for retiro in retiros:
+                resultado = {
+                    'id_retiro': retiro.id_retiro,
+                    'fecha_hora': retiro.fecha_hora.strftime("%Y-%m-%d %H:%M:%S"),
+                    'monto': retiro.monto,
+                    'motivo': retiro.motivo,
+                    'id_corte_caja': retiro.id_corte_caja,
+                    'id_usuario': retiro.id_usuario
+                }
+                resultados.append(resultado)
+            return resultados
+        except Exception as ex:
             raise Exception(ex)

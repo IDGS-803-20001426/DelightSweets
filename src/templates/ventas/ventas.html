@@ -6,86 +6,131 @@
 {% endblock %}
 {% block body %}
 <div class="alert-container" id="alert-container"></div>
-<div class="container row">
-    <div class="col-sm-6 col-lg-8">
-        <div class="productos">
-            <div class="row">
-                {% for galleta in galletas %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="galletas">
-                        <div class="imagen_galleta">
-                            <img src="{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
-                        </div>
-                        <div class="info_galleta">
-                            <p>{{ galleta.nombre }}</p>  
-                            <div class="d-grid gap-2">
-                                <button 
-                                class="btn btn-primary" 
-                                type="button" 
-                                data-bs-toggle="modal" 
-                                {% if galleta.disponible|int <= 0 %}  
-                                onclick="sinDisponible('{{ galleta.nombre }}')"
-                                {% else %}
-                                data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" 
-                                onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}','{{ galleta.disponible }}','{{ galleta.nombre }}','{{galleta.gramos_por_pieza}}')"
-                                {% endif %} >AGREGAR</button>
+{% if corte_caja is not none and corte_caja.estatus == 0 %}
+    {% if not necesita_corte.recolecta %}
+    <div class="container row">
+        <div class="col-sm-6 col-lg-8">
+            <div class="productos">
+                <div class="row">
+                    {% for galleta in galletas %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="galletas">
+                            <div class="imagen_galleta">
+                                <img src="{{ galleta.imagen }}" alt="{{ galleta.nombre }}">
                             </div>
-                            <!-- MODAL -->
-                            <div class="modal fade" id="staticBackdrop{{ galleta.id_galleta }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                    <div class="modal-header_{{ galleta.id_galleta }}">
-                                        <h5 class="modal-title_{{ galleta.id_galleta }}" id="staticBackdropLabel">{{ galleta.nombre }} disponibles: {{ galleta.disponible }} </h5>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row">
-                                            <div class="col-sm-6">
-                                                <form id="form_{{ galleta.id_galleta }}">
-                                                    <div class="mb-3">
+                            <div class="info_galleta">
+                                <p>{{ galleta.nombre }}</p>  
+                                <div class="d-grid gap-2">
+                                    <button 
+                                    class="btn btn-primary" 
+                                    type="button" 
+                                    data-bs-toggle="modal" 
+                                    {% if galleta.disponible|int <= 0 %}  
+                                    onclick="sinDisponible('{{ galleta.nombre }}')"
+                                    {% else %}
+                                    data-bs-target="#staticBackdrop{{ galleta.id_galleta }}" 
+                                    onclick="habilitarConfirmarOrden('{{ galleta.id_galleta }}','{{ galleta.disponible }}','{{ galleta.nombre }}','{{galleta.gramos_por_pieza}}')"
+                                    {% endif %} >AGREGAR</button>
+                                </div>
+                                <!-- MODAL -->
+                                <div class="modal fade" id="staticBackdrop{{ galleta.id_galleta }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                        <div class="modal-header_{{ galleta.id_galleta }}">
+                                            <h5 class="modal-title_{{ galleta.id_galleta }}" id="staticBackdropLabel">{{ galleta.nombre }} disponibles: {{ galleta.disponible }} </h5>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-sm-6">
+                                                    <form id="form_{{ galleta.id_galleta }}">
+                                                        <div class="mb-3">
+                                                        </div>
+                                                        <div id="cantidad_button_{{ galleta.id_galleta }}" class="mb-3" style="display: none;">
+                                                            <label for="cantidad_{{ galleta.id_galleta }}" class="form-label">Cantidad:</label>
+                                                            <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="handleInputChange(this)" onblur="validateAndRoundQuantity(this, '{{galleta.gramos_por_pieza}}', '{{ galleta.nombre }}')">
+                                                            <span id="mensaje_error_{{ galleta.id_galleta }}" class="text-danger" style="display: none;"></span>
+                                                            <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}','{{ galleta.disponible }}')">Añadir</button>
+                                                        </div>
+                                                    </form>
+                                                </div>                                        
+                                                <div class="col-sm-6">
+                                                    <div id="cantidades-container_{{ galleta.id_galleta }}">
+                                                        <p id="mensaje-vacio">Añade tus galletas</p>
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     </div>
-                                                    <div id="cantidad_button_{{ galleta.id_galleta }}" class="mb-3" style="display: none;">
-                                                        <label for="cantidad_{{ galleta.id_galleta }}" class="form-label">Cantidad:</label>
-                                                        <input type="number" class="form-control" id="cantidad_{{ galleta.id_galleta }}" name="cantidad" oninput="handleInputChange(this)" onblur="validateAndRoundQuantity(this, '{{galleta.gramos_por_pieza}}', '{{ galleta.nombre }}')">
-                                                        <span id="mensaje_error_{{ galleta.id_galleta }}" class="text-danger" style="display: none;"></span>
-                                                        <button id="boton_{{ galleta.id_galleta }}" class="btn btn-primary mt-2" onclick="agregarCantidad(event, '{{ galleta.id_galleta }}', '{{ galleta.nombre }}', '{{ galleta.costo_galleta }}', '{{ galleta.gramos_por_pieza }}','{{ galleta.disponible }}')">Añadir</button>
-                                                    </div>
-                                                </form>
-                                            </div>                                        
-                                            <div class="col-sm-6">
-                                                <div id="cantidades-container_{{ galleta.id_galleta }}">
-                                                    <p id="mensaje-vacio">Añade tus galletas</p>
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                </div>
-                                            </div>                                            
+                                                </div>                                            
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">Cancelar</button>
+                                            <button id="boton_confirmar_orden_{{ galleta.id_galleta }}"  type="button" class="btn btn-primary" onclick="confirmarOrden('{{ galleta.id_galleta }}')">Confirmar Orden</button>
+                                            <button type="button" class="btn btn-secondary" onclick="confirmarCancelar('{{ galleta.id_galleta }}')">Eliminar Pedido</button>
+                                        </div>
                                         </div>
                                     </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="limpiarFormulario('{{ galleta.id_galleta }}')">Cancelar</button>
-                                        <button id="boton_confirmar_orden_{{ galleta.id_galleta }}"  type="button" class="btn btn-primary" onclick="confirmarOrden('{{ galleta.id_galleta }}')">Confirmar Orden</button>
-                                        <button type="button" class="btn btn-secondary" onclick="confirmarCancelar('{{ galleta.id_galleta }}')">Eliminar Pedido</button>
-                                    </div>
-                                    </div>
                                 </div>
+                                <!-- MODAL-->
                             </div>
-                            <!-- MODAL-->
                         </div>
                     </div>
+                    {% endfor %}        
                 </div>
-                {% endfor %}        
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <div class="ventas">
+                <div class="ventas_orden"></div>            
+                <div class="boton_vender">
+                    <button type="button" class="btn btn-primary w-100"
+                    onclick="enviarDatosLocalStorageAlServidor()"
+                    >Guardar venta</button>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-4">
-        <div class="ventas">
-            <div class="ventas_orden"></div>            
-            <div class="boton_vender">
-                <button type="button" class="btn btn-primary w-100"
-                onclick="enviarDatosLocalStorageAlServidor()"
-                >Guardar venta</button>
+    {% else %}
+    <div class="container row">
+        <form action="/ventas_recolecta" method="POST" id="form_recolecta">
+            <p>Exceso de efectivo, favor de realizar una recolecta. Cantidad sugerida: ${{ necesita_corte.dinero_en_caja }} pesos.</p>
+            <div class="mb-3">
+                <label for="monto_retirar" class="form-label">Monto a retirar</label>
+                <div class="centrar_input">
+                    <input type="number" class="form-control small_input" id="monto_retirar" name="monto_retirar" required oninput="validarMonto('{{ necesita_corte.dinero_en_caja }}')">
+                </div>
+                <div id="monto_error" style="color: red;"></div>
             </div>
-        </div>
+            <div class="mb-3">
+                <label for="numero_empleado" class="form-label">Número de empleado</label>
+                <div class="centrar_input">
+                    <input type="number" class="form-control small_input" id="numero_empleado" name="numero_empleado" required>
+                </div>
+            </div>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary" id="btn_recolecta" disabled>Realizar recolecta</button>
+        </form>
+    </div>
+    {% endif %}
+{% else %}
+<div class="corte_de_caja">
+    <div class="container row">
+        <form action="/ventas_diarias" method="POST">
+            <div class="mb-3">
+                <label for="numero_empleado" class="form-label">Bienvenido al módulo de ventas</label>
+            </div>
+            <div class="mb-3">
+                <label for="numero_empleado" class="form-label">Ingresa tu número de empleado</label>
+                <div class="centrar_input">
+                    <input type="number" class="form-control small_input" id="numero_empleado" name="numero_empleado" required oninput="validarUsuario(this)">
+                </div>
+                <div id="error_corte" style="color: red;"></div>
+            </div>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary" id="btn_corte" disabled>Enviar</button>
+        </form>
     </div>
 </div>
+{% endif %}
+
 {% block customJS %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/ventas.js') }}"></script>

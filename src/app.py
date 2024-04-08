@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash
 from models.Models import User,db,Rol,Galleta
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
-from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO
 from config import DevelopmentConfig
 
 # PDF
@@ -108,22 +108,63 @@ def home():
     else:
         return render_template('home.html')
 
+@app.route('/ventas_recolecta', methods=["GET", "POST"])
+def ventasRecolecta():
+    galletas = GalletaDAO.get_costo_galletas()
+    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+    
+    if request.method == "POST":
+        id_usuario = request.form.get('numero_empleado')
+        monto = request.form.get('monto_retirar')
+        fecha_hora = datetime.now()
+        insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']))
+    
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+
+@app.route('/ventas_diarias', methods=["GET", "POST"])
+def ventasCorte():
+    galletas = GalletaDAO.get_costo_galletas()
+    
+    if request.method == "POST":
+        id_usuario = request.form.get('numero_empleado')
+        fecha_de_inicio = datetime.now().date()
+        hora_inicio = datetime.now().time()
+        fecha_de_termino = None
+        hora_termino = None
+        estatus = 0
+
+        id_corte_caja = CorteCajaDAO.insertar_corte_caja(
+            fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario
+        )
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+
+    else:
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()        
+    
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+
 
 @app.route('/ventas', methods=["GET", "POST"])
 def ventas():
     galletas = GalletaDAO.get_costo_galletas()
     # print(galletas)
-    orden_venta = []
-    
+    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+    print(necesita_corte)
+
     if request.method == "POST":
         datos_orden = request.json.get('orden_venta')
-        # print(datos_orden)
 
         fecha_venta = datetime.now().date()
         hora_venta = datetime.now().time()
         
         try:
             id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
+            insertar_corte_venta(id_venta, int(corte_caja['id_corte_caja']))
             descontar_inventario(datos_orden)
             pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
             
@@ -143,7 +184,49 @@ def ventas():
             }
             return jsonify(resultado_venta)
     
-    return render_template('ventas/ventas.html', galletas=galletas, orden=orden_venta)
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
+
+# -------------- INSERTAR RETIRO --------------
+def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
+    try:
+        RetiroDAO.insertar_retiro(fecha_hora, monto, 'recolecta',id_corte_caja,id_usuario)
+        CorteCajaVentaDAO.actualizar_estatus(id_corte_caja)
+        return 
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERTAR RETIRO --------------
+
+# -------------- REQUIERE CORTE --------------
+def verificar_corte(id_corte_caja):
+    try:
+        cortes = CorteCajaVentaDAO.consultar_por_id_corte_caja(id_corte_caja)
+        total_ventas = 0 
+
+        for corte in cortes:
+            id_venta = corte['id_venta']
+            total_venta = VentaDAO.obtener_total_por_id_venta(id_venta)
+            total_ventas += total_venta 
+
+        total_ventas = round(total_ventas, 2)
+
+        recolecta = total_ventas > 500
+        resultado = {'dinero_en_caja': total_ventas, 'recolecta': recolecta}
+
+        return resultado
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- REQUIERE CORTE --------------
+
+# -------------- INSERT DE CORTE --------------
+def insertar_corte_venta(id_venta, id_corte_caja):
+    try:
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        CorteCajaVentaDAO.insertar_corte_caja_venta(id_venta, id_corte_caja,1)
+        
+        return
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERT DE CORTE --------------
 
 # -------------- INSERT DE VENTA --------------
 def insertar_venta(datos_orden, fecha_venta, hora_venta):

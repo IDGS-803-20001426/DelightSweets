@@ -134,3 +134,13 @@ body {
   top: 0;
   z-index: 1000; /* Asegura que esté por encima de otros elementos */
 }
+
+.centrar_input{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.small_input{
+  width: 25%;
+}

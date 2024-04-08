@@ -571,3 +571,49 @@ function sinDisponible(nombre){
     showAlert('warning', 'No hay ' + nombre + ' disponibles por el momento');
 }
 
+function validarMonto(dineroEnCaja) {
+    
+    dineroEnCaja = parseFloat(dineroEnCaja);
+
+    var montoRetirar = parseFloat(document.getElementById('monto_retirar').value);
+    var btnRecolecta = document.getElementById('btn_recolecta');
+    var montoError = document.getElementById('monto_error');
+
+    if (isNaN(montoRetirar)) {
+        montoError.textContent = "El monto a retirar debe ser un número válido.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    if (montoRetirar > dineroEnCaja) {
+        montoError.textContent = "No puedes retirar más de " + dineroEnCaja + " pesos.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+    var resta = dineroEnCaja - montoRetirar;
+    var monto_minimo = dineroEnCaja - 200; 
+    if (resta > 200) {
+        montoError.textContent = "No puedes dejar más de 200 pesos en caja, monto minimo: $"+monto_minimo+' pesos.';
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    montoError.textContent = "";
+    btnRecolecta.disabled = false;
+}
+
+function validarUsuario(id_usuario) {
+    console.log(id_usuario.value);
+    var btnRecolecta = document.getElementById('btn_corte');
+    var montoError = document.getElementById('error_corte');
+    
+    if (isNaN(id_usuario.value) || id_usuario.value ==='') {
+        montoError.textContent = "Ingresa un número de empleado válido.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    montoError.textContent = "";
+    btnRecolecta.disabled = false;
+
+}
