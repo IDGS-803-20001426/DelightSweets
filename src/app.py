@@ -1,4 +1,4 @@
-from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort
+from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort,session,request, make_response
 from flask_wtf.csrf import CSRFProtect
 from flask_wtf import FlaskForm
 from flask_mysqldb import MySQL
@@ -824,6 +824,13 @@ def sanitizarDatos(inputString):
 
 
 
+@app.route('/obtener_costo', methods=['POST'])
+def obtener_costo():
+    id_producto = request.form.get('id_producto')
+    print("idproducto------------------------------------>{}".format(id_producto))
+    # Obtén el costo de la materia prima desde la base de datos
+    costo = MateriaPrima.query.filter_by(id_materia=id_producto).first().costo
+    return jsonify({'costo': costo})
 
 # Define una clase Form personalizada para el formulario de compras
 class CompraForm(FlaskForm):
@@ -833,13 +840,19 @@ class CompraForm(FlaskForm):
     fecha_compra = DateField('Fecha de Compra', validators=[DataRequired()])
     fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
     nombre_proveedor = SelectField('Nombre del Proveedor', coerce=int, validators=[DataRequired()])
+    costo_oculto = HiddenField('Costo Oculto')
 
     def __init__(self, *args, **kwargs):
         super(CompraForm, self).__init__(*args, **kwargs)
+        self.setup_choices()
+        self.setup_default_values()
+
+    def setup_choices(self):
         # Consultar los nombres de productos disponibles en la base de datos
         productos = MateriaPrima.query.all()
         # Crear una lista de opciones para el campo de selección de productos
         opciones_productos = [(producto.id_materia, producto.nombre) for producto in productos]
+        
         # Establecer las opciones en el campo de selección de productos
         self.nombre_producto.choices = opciones_productos 
 
@@ -849,18 +862,25 @@ class CompraForm(FlaskForm):
         opciones_proveedores = [(proveedor.id_proveedor, proveedor.nombre) for proveedor in proveedores]
         # Establecer las opciones en el campo de selección de proveedores
         self.nombre_proveedor.choices = opciones_proveedores 
-        
+
+    def setup_default_values(self):
         # Establecer la fecha actual como valor predeterminado para la fecha de compra
         self.fecha_compra.data = datetime.today().date()
+        # self.cantidad.data = 21
 
 # Define una clase ModelView personalizada para las compras
+
 class CompraView(ModelView):
     form = CompraForm
     column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
+    create_template = 'admin/create.html'
+ 
 
     def on_model_change(self, form, model, is_created):
+        
         # Obtener el nombre del producto seleccionado en el formulario
         id_producto = form.nombre_producto.data
+        session['variable'] = True
         nombre_producto = MateriaPrima.query.filter_by(id_materia=id_producto).first().nombre
         
         # Asignar el nombre del producto a la instancia del modelo Compra
@@ -886,11 +906,11 @@ class CompraView(ModelView):
 
         # Obtener el objeto de materia prima correspondiente al producto comprado
         materia_prima = MateriaPrima.query.get(id_producto)
-        # Actualizar el costo de la materia prima con el precio de compra
-        materia_prima.costo = form.precio_compra.data
-
-        # Confirmar los cambios en la base de datos
-        db.session.commit()
+        prueba = request.cookies.get('pruebas')
+        if prueba == 'true':
+            total_costo = round(form.precio_compra.data / form.cantidad.data, 2)
+            materia_prima.costo = total_costo
+            db.session.commit()
         # Mensaje de confirmación
         flash('Se ha registrado la compra y actualizado el inventario y el costo de materia prima', 'success')
 
