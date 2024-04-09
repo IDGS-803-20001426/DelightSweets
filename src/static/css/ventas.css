@@ -132,15 +132,16 @@ body {
   position: fixed;
   width: 100%;
   top: 0;
-  z-index: 1000; /* Asegura que esté por encima de otros elementos */
+  z-index: 1000;
 }
 
 .btn_terminar_corte {
   position: fixed;
-  width: 100%;
-  top: 0;
+  top: 5px;
   z-index: 999;
+  right: 5px;
 }
+
 
 .centrar_input{
   width: 100%;

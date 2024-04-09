@@ -622,3 +622,12 @@ function validarUsuario(id_usuario) {
 function finalizarCorte(id_corte_caja){
     alert(id_corte_caja);
 }
+
+function confirmarFinalizarCorte() {
+    var respuesta = confirm("¿Estás seguro de que deseas finalizar el corte de caja?");
+    if (respuesta == true) {
+        document.getElementById("form_finalizar_corte").submit();
+    } else {
+        return false;
+    }
+}
