@@ -108,7 +108,14 @@ def home():
     else:
         return render_template('home.html')
 
-from flask import render_template
+@app.route('/descargarPDF', methods=["POST"])
+def descargarPDF():
+    if request.method == "POST":
+        pdf_base64 = request.form['pdf_base64']
+        pdf_bytes = base64.b64decode(pdf_base64)
+        with open("corte_caja.pdf", "wb") as f:
+            f.write(pdf_bytes)
+        return send_file("corte_caja.pdf", as_attachment=True)
 
 @app.route('/finalizarCorte', methods=["GET", "POST"])
 def finalizarCorte():
@@ -121,7 +128,7 @@ def finalizarCorte():
         monto_retiro_total = 0
         
         try:
-            CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
+            # CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
             cortes = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
             for corte in cortes:
                 total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
@@ -132,7 +139,9 @@ def finalizarCorte():
             for retiro in retiros:
                 monto_retiro_total += retiro['monto']
 
-            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total)
+            pdf_base64 = generar_pdf_corte(cortes, VentaDelDía, retiros, monto_retiro_total)
+            # print(pdf_base64)
+            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total, pdf_base64=pdf_base64)
         
         except Exception as ex:
             print("Error al finalizar el corte de caja:", ex)
@@ -325,7 +334,7 @@ def descontar_inventario(datos_orden):
         raise Exception(ex)
 # -------------- DESCONTAR INVENTARIO --------------
 
-# -------------- GENERACIÓN DEL PDF --------------
+# -------------- GENERACIÓN DEL PDF DE VENTAS--------------
 def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
     subtotal = 0
     
@@ -395,7 +404,85 @@ def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
 
     return pdf_base64
 
-# -------------- GENERACIÓN DEL PDF --------------
+# -------------- GENERACIÓN DEL PDF DE VENTAS --------------
+
+# -------------- GENERACIÓN DEL PDF DE CORTES --------------
+def generar_pdf_corte(cortes, venta_del_dia, retiros, monto_retiro_total):
+    now = datetime.now()
+    pdf_filename = f"corte_caja_{now.strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
+    
+    folder_path = os.path.join(os.getcwd(), "cortes_de_caja")
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    pdf_path = os.path.join(folder_path, pdf_filename)
+    
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    elements = []
+
+    style = getSampleStyleSheet()['Title']
+    elements.append(Paragraph("Cortes de Caja Totales", style))
+    elements.append(Spacer(1, 20))
+
+    elements.append(Paragraph(f"Venta del día: ${venta_del_dia:.2f}", style))
+    elements.append(Spacer(1, 10))
+
+    # Tabla de cortes de caja
+    data_cortes = [["ID Corte Caja Venta", "ID Venta", "ID Corte Caja", "Total Venta"]]
+    for corte in cortes:
+        data_cortes.append([
+            corte['id_corte_caja_venta'],
+            corte['id_venta'],
+            corte['id_corte_caja'],
+            round(corte['total_venta'], 2)
+        ])
+    table_cortes = Table(data_cortes)
+    table_cortes.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table_cortes)
+    elements.append(Spacer(1, 20))
+
+    # Tabla de retiros
+    data_retiros = [["ID Retiro", "Fecha y Hora", "Monto", "Motivo", "ID Corte Caja", "ID Usuario"]]
+    for retiro in retiros:
+        data_retiros.append([
+            retiro['id_retiro'],
+            retiro['fecha_hora'],
+            round(retiro['monto'], 2),
+            retiro['motivo'],
+            retiro['id_corte_caja'],
+            retiro['id_usuario']
+        ])
+    table_retiros = Table(data_retiros)
+    table_retiros.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table_retiros)
+    elements.append(Spacer(1, 20))
+
+    elements.append(Paragraph(f"Monto Total de Retiros: ${monto_retiro_total:.2f}", style))
+
+    doc.build(elements)
+
+    with open(pdf_path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    return pdf_base64
+# -------------- GENERACIÓN DEL PDF DE CORTES --------------
 
 
 @app.route('/protected')
