@@ -223,7 +223,7 @@ class CorteCajaVentaDAO:
             corte_caja_ventas = CorteCajaVenta.query.filter_by(id_corte_caja=id_corte_caja).all()
             resultados = []
             for corte_caja_venta in corte_caja_ventas:
-                print(corte_caja_venta)
+                # print(corte_caja_venta)
                 resultado = {
                     'id_corte_caja_venta': corte_caja_venta.id_corte_caja_venta,
                     'id_venta': corte_caja_venta.id_venta,
@@ -266,9 +266,10 @@ class RetiroDAO:
             raise Exception(ex)
 
     @classmethod
-    def consultar_todos(cls):
+    def consultar_por_id_corte_caja(cls, id_corte_caja):
         try:
-            retiros = Retiro.query.all()
+            # print(id_corte_caja)
+            retiros = Retiro.query.filter_by(id_corte_caja=id_corte_caja).all()
             resultados = []
             for retiro in retiros:
                 resultado = {
@@ -283,3 +284,4 @@ class RetiroDAO:
             return resultados
         except Exception as ex:
             raise Exception(ex)
+

@@ -1,43 +1,78 @@
 {% extends './layout.html' %}
 
 {% block title %}Corte de caja{% endblock %}
+
 {% block body %}
 <body>
-    <h1>Cortes de Caja Totales</h1>
+    <div class="container">
+        <h1 class="text-center mt-5">Cortes de Caja Totales</h1>
 
-    <div>
-        <p>Venta del día: {{ VentaDelDía }}</p>
-    </div>
+        <div class="text-center mb-3">
+            <p>Venta del día: {{ VentaDelDía }}</p>
+        </div>
 
-    <div>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Corte Caja</th>
-                    <th>Fecha de Inicio</th>
-                    <th>Hora de Inicio</th>
-                    <th>Fecha de Término</th>
-                    <th>Hora de Término</th>
-                    <th>Estatus</th>
-                    <th>ID Usuario</th>
-                    <th>Total Venta</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for corte in cortesDeCajaTotales %}
-                <tr>
-                    <td>{{ corte.id_corte_caja }}</td>
-                    <td>{{ corte.fecha_de_inicio }}</td>
-                    <td>{{ corte.hora_inicio }}</td>
-                    <td>{{ corte.fecha_de_termino }}</td>
-                    <td>{{ corte.hora_termino }}</td>
-                    <td>{{ corte.estatus }}</td>
-                    <td>{{ corte.id_usuario }}</td>
-                    <td>{{ corte.total_venta }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>ID Corte Caja Venta</th>
+                        <th>ID Venta</th>
+                        <th>ID Corte Caja</th>
+                        <th>Total Venta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for corte in cortes %}
+                    <tr>
+                        <td>{{ corte.id_corte_caja_venta }}</td>
+                        <td>{{ corte.id_venta }}</td>
+                        <td>{{ corte.id_corte_caja }}</td>
+                        <td>{{ corte.total_venta }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>ID Retiro</th>
+                        <th>Fecha y Hora</th>
+                        <th>Monto</th>
+                        <th>Motivo</th>
+                        <th>ID Corte Caja</th>
+                        <th>ID Usuario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for retiro in retiros %}
+                    <tr>
+                        <td>{{ retiro.id_retiro }}</td>
+                        <td>{{ retiro.fecha_hora }}</td>
+                        <td>{{ retiro.monto }}</td>
+                        <td>{{ retiro.motivo }}</td>
+                        <td>{{ retiro.id_corte_caja }}</td>
+                        <td>{{ retiro.id_usuario }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2">Monto Total de Retiros:</td>
+                        <td>{{ monto_retiro_total }}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="text-center mt-3">
+            <form action="/ventas" method="get">
+                <button type="submit" class="btn btn-primary">Regresar</button>
+            </form>
+        </div>
     </div>
 </body>
 {% endblock %}

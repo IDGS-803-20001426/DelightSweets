@@ -118,24 +118,27 @@ def finalizarCorte():
         fecha_de_termino = datetime.now().date()
         hora_termino = datetime.now().time()
         VentaDelDía = 0
+        monto_retiro_total = 0
         
         try:
             CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
-            cortesDeCajaTotales = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
-            
-            for corte in cortesDeCajaTotales:
+            cortes = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
+            for corte in cortes:
                 total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
                 corte['total_venta'] = total
                 VentaDelDía += total
+            
+            retiros = RetiroDAO.consultar_por_id_corte_caja(id_corte_caja)
+            for retiro in retiros:
+                monto_retiro_total += retiro['monto']
 
-            print(cortesDeCajaTotales)
-            print(VentaDelDía)
-            return render_template('ventas/corteCaja.html', cortesDeCajaTotales=cortesDeCajaTotales, VentaDelDía=VentaDelDía)
+            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total)
         
         except Exception as ex:
             print("Error al finalizar el corte de caja:", ex)
         
     return render_template('ventas/corteCaja.html')
+
 
 
 @app.route('/ventas_recolecta', methods=["GET", "POST"])

@@ -39,7 +39,8 @@ function enviarDatosLocalStorageAlServidor() {
             showAlert('success', data.message);
             setTimeout(function() {
                 localStorage.clear();
-                window.location.reload();
+                // window.location.reload();
+                window.location.href = "/ventas";
                 if (data.pdf_base64) {
                     var pdfWindow = window.open("");
                     pdfWindow.document.write(
