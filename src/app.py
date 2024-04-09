@@ -1405,21 +1405,23 @@ def finalizarCorte():
     return render_template('ventas/corteCaja.html')
 
 
+class VentasRecolectaView(BaseView):
+    @expose('/', methods=['GET', 'POST'])
+    def index(self):
+        galletas = GalletaDAO.get_costo_galletas()
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        
+        if request.method == "POST":
+            id_usuario = request.form.get('numero_empleado')
+            monto = request.form.get('monto_retirar')
+            fecha_hora = datetime.now()
+            insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']))
+        
+        necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
 
-@app.route('/ventas_recolecta', methods=["GET", "POST"])
-def ventasRecolecta():
-    galletas = GalletaDAO.get_costo_galletas()
-    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
-    
-    if request.method == "POST":
-        id_usuario = request.form.get('numero_empleado')
-        monto = request.form.get('monto_retirar')
-        fecha_hora = datetime.now()
-        insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']))
-    
-    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+admin.add_view(VentasRecolectaView(name='VentasRecolecta', endpoint='ventas_recolecta'))
 
-    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
 
 @app.route('/ventas_diarias', methods=["GET", "POST"])
 def ventasCorte():
@@ -1446,44 +1448,46 @@ def ventasCorte():
     return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
 
 
-@app.route('/ventas', methods=["GET", "POST"])
-def ventas():
-    galletas = GalletaDAO.get_costo_galletas()
-    # print(galletas)
-    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
-    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
-    # print(necesita_corte)
-
-    if request.method == "POST":
-        datos_orden = request.json.get('orden_venta')
-
-        fecha_venta = datetime.now().date()
-        hora_venta = datetime.now().time()
+class VenderView(BaseView):
+    @expose('/', methods=['GET', 'POST'])
+    def index(self):
+        galletas = GalletaDAO.get_costo_galletas()
+        # print(galletas)
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+        # print(necesita_corte)
         
-        try:
-            id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
-            insertar_corte_venta(id_venta, int(corte_caja['id_corte_caja']))
-            descontar_inventario(datos_orden)
-            pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
+        if request.method == "POST":
+            datos_orden = request.json.get('orden_venta')
+
+            fecha_venta = datetime.now().date()
+            hora_venta = datetime.now().time()
             
-            resultado_venta = {
-                'success': True, 
-                'message': 'Venta registrada exitosamente',
-                'pdf_base64': pdf_base64,  
-                'id_venta': id_venta 
-            }
+            try:
+                id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
+                insertar_corte_venta(id_venta, int(corte_caja['id_corte_caja']))
+                descontar_inventario(datos_orden)
+                pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
+                
+                resultado_venta = {
+                    'success': True, 
+                    'message': 'Venta registrada exitosamente',
+                    'pdf_base64': pdf_base64,  
+                    'id_venta': id_venta 
+                }
 
-            return jsonify(resultado_venta)
-        except Exception as ex:
-            resultado_venta = {
-                'success': False, 
-                'message': 'Error al registrar la venta',
-                'error': str(ex)
-            }
-            return jsonify(resultado_venta)
+                return jsonify(resultado_venta)
+            except Exception as ex:
+                resultado_venta = {
+                    'success': False, 
+                    'message': 'Error al registrar la venta',
+                    'error': str(ex)
+                }
+                return jsonify(resultado_venta)
 
-    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
-
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
+        
+admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin'))
 # -------------- INSERTAR RETIRO --------------
 def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
     try:

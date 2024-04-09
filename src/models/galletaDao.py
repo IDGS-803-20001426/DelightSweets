@@ -23,7 +23,7 @@ class GalletaDAO:
                 Galleta.nombre,
                 Galleta.imagen,
                 func.ROUND(
-                    (Galleta.porcentaje_ganacia * func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo)) + func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo),
+                    (Galleta.porcentaje_ganancia * func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo)) + func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo),
                     1
                 ).label('costo_galleta'),
                 inventario_disponible_subquery.c.disponible.label('disponible'),
@@ -41,7 +41,7 @@ class GalletaDAO:
             ).outerjoin(
                 inventario_disponible_subquery, Galleta.id_galleta == inventario_disponible_subquery.c.id_galleta
             ).group_by(
-                Galleta.id_galleta, Galleta.nombre, Galleta.imagen, Galleta.porcentaje_ganacia, Equivalencia.piezas, Equivalencia.gramaje
+                Galleta.id_galleta, Galleta.nombre, Galleta.imagen, Galleta.porcentaje_ganancia, Equivalencia.piezas, Equivalencia.gramaje
             ).all()
 
             return resultado

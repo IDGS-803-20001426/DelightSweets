@@ -249,6 +249,14 @@
   {% endblock page_body%}
 
   {% block tail_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
+        if (ventasRecolectaLink) {
+            ventasRecolectaLink.style.display = 'none';
+        }
+    });
+  </script>
   <!-- jQuery 2.2.3 -->
   <script src="{{url_for('static',filename='plugins/jQuery/jquery-2.2.3.min.js')}}"></script>
   <!-- jQuery UI 1.11.4 -->

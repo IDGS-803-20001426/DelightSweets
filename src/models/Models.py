@@ -93,17 +93,17 @@ class Galleta(db.Model):
 
     id_galleta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
     nombre = db.Column(db.String(100), nullable=False)
-    porcentaje_ganacia = db.Column(db.Float, nullable=False)
+    porcentaje_ganancia = db.Column(db.Float, nullable=False)
     imagen = db.Column(db.Text)
     inventarios = relationship('InventarioProductoTerminado', backref='galleta')
-    recetas = relationship('Receta', backref='galleta')
+    recetas = relationship('Receta', backref='galleta')  # Elimina este backref
 
     def __repr__(self) -> str:
        return f'{self.nombre}'
 
-    def __init__(self, nombre, porcentaje_ganacia, imagen=None):
+    def __init__(self, nombre, porcentaje_ganancia, imagen=None):
         self.nombre = nombre
-        self.porcentaje_ganacia = porcentaje_ganacia
+        self.porcentaje_ganancia = porcentaje_ganancia
         self.imagen = imagen
 
 class RecetaMateriaIntermedia(db.Model):
@@ -125,7 +125,8 @@ class Equivalencia(db.Model):
     piezas = db.Column(db.Integer, nullable=False)
     gramaje = db.Column(db.Float, nullable=False)
 
-    receta = db.relationship('Receta', backref=db.backref('equivalencias', lazy=True))
+    # receta = db.relationship('Receta', backref=db.backref('equivalencias', lazy=True))
+
     def __repr__(self) -> str:
        return f'{self.gramaje} gr - {self.piezas} pz'
 
@@ -143,7 +144,7 @@ class DetalleVenta(db.Model):
     
     id_detalle_venta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
     id_venta = db.Column(db.SmallInteger, db.ForeignKey('venta.id_venta'), nullable=False)
-    id_galleta = db.Column(db.SmallInteger, nullable=False)
+    id_galleta = db.Column(Integer, ForeignKey('galleta.id_galleta'), nullable=False)
     medida = db.Column(db.String(20), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
     total = db.Column(db.Float, nullable=False)
@@ -160,8 +161,10 @@ class InventarioProductoTerminado(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     estatus = db.Column(db.Integer, default=None)
 
-    galleta = db.relationship('Galleta', backref=db.backref('inventario_producto_terminado', lazy=True))
+    galleta_relacionada = db.relationship('Galleta', backref=db.backref('inventarios_producto_terminado', lazy=True))
     mermas = relationship("MermaProdTerminado", back_populates="inventario_prod_terminado")
+
+    
     def __init__(self, id_galleta, fecha_produccion, cantidad, estatus=None):
         self.id_galleta = id_galleta
         self.fecha_produccion = fecha_produccion
@@ -198,14 +201,15 @@ class Receta(db.Model):
     nombre_receta = db.Column(db.String(100), nullable=False)
     id_galleta = db.Column(db.SmallInteger, db.ForeignKey('galleta.id_galleta'), nullable=False)
     # Relación de uno a uno con Equivalencia
-    equivalencias = db.relationship("Equivalencia", backref="recetas", uselist=False, cascade="all, delete-orphan")
-    galletas = db.relationship("Galleta",  backref="recetas_galleta")
+    equivalencias = db.relationship("Equivalencia", backref="receta", uselist=False, cascade="all, delete-orphan")
+    galletas = db.relationship("Galleta", backref="recetas_galleta")
     materias = db.relationship("MateriaPrima", secondary='receta_materia_intermedia', back_populates='recetas')
-    galleta = db.relationship('Galleta', backref=db.backref('recetas', lazy=True))
-    #receta_materia_intermedia = db.relationship("RecetaMateriaIntermedia",  backref='recetas_materias')
+    # Elimina este backref para resolver el conflicto
+    # galleta = db.relationship('Galleta', backref=db.backref('recetas', lazy=True))
 
     def __repr__(self) -> str:
        return f'{self.nombre_receta}'
+
 
 class MateriaPrima(db.Model):
     __tablename__ = 'materia_prima'

@@ -19,7 +19,7 @@ function enviarDatosLocalStorageAlServidor() {
     var csrfToken = document.querySelector('input[name="csrf_token"]').value;
     console.log('CSRF Token:', csrfToken);
 
-    fetch('/ventas', {
+    fetch('/admin/ventas_admin/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -40,7 +40,7 @@ function enviarDatosLocalStorageAlServidor() {
             setTimeout(function() {
                 localStorage.clear();
                 // window.location.reload();
-                window.location.href = "/ventas";
+                window.location.href = "http://127.0.0.1:5000/admin/ventas_admin/";
                 if (data.pdf_base64) {
                     var pdfWindow = window.open("");
                     pdfWindow.document.write(
@@ -60,7 +60,7 @@ function enviarDatosLocalStorageAlServidor() {
 }
 
 
-function showAlert(type, message) {
+function showAlert1(type, message) {
     var alertDiv = document.createElement('div');
     alertDiv.classList.add('alert', 'alert-' + type, 'alert-dismissible', 'fade', 'show');
     alertDiv.setAttribute('role', 'alert');
@@ -82,6 +82,35 @@ function showAlert(type, message) {
         alertDiv.remove();
     }, 2000);
 }
+
+function showAlert(type, message) {
+    var alertDiv = document.createElement('div');
+    alertDiv.classList.add('alert', 'alert-' + type, 'alert-dismissible', 'fade', 'show');
+    alertDiv.setAttribute('role', 'alert');
+
+    var closeButton = document.createElement('button');
+    closeButton.classList.add('close');
+    closeButton.setAttribute('type', 'button');
+    closeButton.setAttribute('data-dismiss', 'alert');
+    closeButton.setAttribute('aria-label', 'Close');
+
+    var closeIcon = document.createElement('span');
+    closeIcon.setAttribute('aria-hidden', 'true');
+    closeIcon.innerHTML = '&times;';
+
+    var messageText = document.createTextNode(message);
+
+    closeButton.appendChild(closeIcon);
+    alertDiv.appendChild(messageText);
+    alertDiv.appendChild(closeButton);
+
+    var container = document.getElementById('alert-container');
+    container.appendChild(alertDiv);
+    setTimeout(function() {
+        alertDiv.remove();
+    }, 2000);
+}
+
 
 function generarOrdenCompra() {
     var ordenVenta = JSON.parse(localStorage.getItem('orden_venta')) || [];
@@ -473,8 +502,9 @@ function confirmarOrden(galletaId) {
         localStorage.removeItem('cantidad_orden');
 
         var modal = document.getElementById('staticBackdrop' + galletaId);
-        var modalInstance = bootstrap.Modal.getInstance(modal);
-        modalInstance.hide();
+        $(modal).modal('hide');
+        // var modalInstance = bootstrap.Modal.getInstance(modal);
+        // modalInstance.hide();
         
     }
     mostrarCantidades(galletaId);
