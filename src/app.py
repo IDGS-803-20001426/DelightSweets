@@ -108,6 +108,36 @@ def home():
     else:
         return render_template('home.html')
 
+from flask import render_template
+
+@app.route('/finalizarCorte', methods=["GET", "POST"])
+def finalizarCorte():
+    
+    if request.method == "POST":
+        id_corte_caja = request.form['id_corte_caja']
+        fecha_de_termino = datetime.now().date()
+        hora_termino = datetime.now().time()
+        VentaDelDía = 0
+        
+        try:
+            CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
+            cortesDeCajaTotales = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
+            
+            for corte in cortesDeCajaTotales:
+                total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
+                corte['total_venta'] = total
+                VentaDelDía += total
+
+            print(cortesDeCajaTotales)
+            print(VentaDelDía)
+            return render_template('ventas/corteCaja.html', cortesDeCajaTotales=cortesDeCajaTotales, VentaDelDía=VentaDelDía)
+        
+        except Exception as ex:
+            print("Error al finalizar el corte de caja:", ex)
+        
+    return render_template('ventas/corteCaja.html')
+
+
 @app.route('/ventas_recolecta', methods=["GET", "POST"])
 def ventasRecolecta():
     galletas = GalletaDAO.get_costo_galletas()
@@ -154,7 +184,7 @@ def ventas():
     # print(galletas)
     corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
     necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
-    print(necesita_corte)
+    # print(necesita_corte)
 
     if request.method == "POST":
         datos_orden = request.json.get('orden_venta')
@@ -183,7 +213,7 @@ def ventas():
                 'error': str(ex)
             }
             return jsonify(resultado_venta)
-    
+
     return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
 
 # -------------- INSERTAR RETIRO --------------

@@ -1,0 +1,43 @@
+{% extends './layout.html' %}
+
+{% block title %}Corte de caja{% endblock %}
+{% block body %}
+<body>
+    <h1>Cortes de Caja Totales</h1>
+
+    <div>
+        <p>Venta del día: {{ VentaDelDía }}</p>
+    </div>
+
+    <div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Corte Caja</th>
+                    <th>Fecha de Inicio</th>
+                    <th>Hora de Inicio</th>
+                    <th>Fecha de Término</th>
+                    <th>Hora de Término</th>
+                    <th>Estatus</th>
+                    <th>ID Usuario</th>
+                    <th>Total Venta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for corte in cortesDeCajaTotales %}
+                <tr>
+                    <td>{{ corte.id_corte_caja }}</td>
+                    <td>{{ corte.fecha_de_inicio }}</td>
+                    <td>{{ corte.hora_inicio }}</td>
+                    <td>{{ corte.fecha_de_termino }}</td>
+                    <td>{{ corte.hora_termino }}</td>
+                    <td>{{ corte.estatus }}</td>
+                    <td>{{ corte.id_usuario }}</td>
+                    <td>{{ corte.total_venta }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+{% endblock %}

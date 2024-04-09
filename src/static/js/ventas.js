@@ -617,3 +617,7 @@ function validarUsuario(id_usuario) {
     btnRecolecta.disabled = false;
 
 }
+
+function finalizarCorte(id_corte_caja){
+    alert(id_corte_caja);
+}

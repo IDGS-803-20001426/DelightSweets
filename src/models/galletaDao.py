@@ -167,7 +167,21 @@ class CorteCajaDAO:
                 return None
         except Exception as ex:
             raise Exception(ex)
-
+    
+    @classmethod
+    def finalizar_corte(cls, id_corte_caja, fecha_de_termino, hora_termino):
+        try:
+            corte_caja = CorteCaja.query.get(id_corte_caja)
+            if corte_caja:
+                corte_caja.fecha_de_termino = fecha_de_termino
+                corte_caja.hora_termino = hora_termino
+                corte_caja.estatus = 1
+                db.session.commit()
+            else:
+                raise ValueError("No se encontró el registro de corte de caja con el ID especificado.")
+        except Exception as ex:
+            db.session.rollback()
+            raise Exception(ex)
 
 class CorteCajaVentaDAO:
 
@@ -192,6 +206,24 @@ class CorteCajaVentaDAO:
             corte_caja_ventas = CorteCajaVenta.query.filter_by(id_corte_caja=id_corte_caja, estatus=1).all()
             resultados = []
             for corte_caja_venta in corte_caja_ventas:
+                resultado = {
+                    'id_corte_caja_venta': corte_caja_venta.id_corte_caja_venta,
+                    'id_venta': corte_caja_venta.id_venta,
+                    'id_corte_caja': corte_caja_venta.id_corte_caja,
+                    'estatus': corte_caja_venta.estatus
+                }
+                resultados.append(resultado)
+            return resultados
+        except Exception as ex:
+            raise Exception(ex)
+        
+    @classmethod
+    def consultar_para_generar_corte(cls, id_corte_caja):
+        try:
+            corte_caja_ventas = CorteCajaVenta.query.filter_by(id_corte_caja=id_corte_caja).all()
+            resultados = []
+            for corte_caja_venta in corte_caja_ventas:
+                print(corte_caja_venta)
                 resultado = {
                     'id_corte_caja_venta': corte_caja_venta.id_corte_caja_venta,
                     'id_venta': corte_caja_venta.id_venta,

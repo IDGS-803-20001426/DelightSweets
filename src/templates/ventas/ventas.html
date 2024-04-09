@@ -6,6 +6,13 @@
 {% endblock %}
 {% block body %}
 <div class="alert-container" id="alert-container"></div>
+<div class="btn_terminar_corte">
+    <form action="/finalizarCorte" method="POST">
+        <input type="hidden" name="id_corte_caja" id="id_corte_caja" value="{{corte_caja.id_corte_caja}}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary" id="btn_finalizar_corte">Finalizar Corte de caja</button>
+    </form>
+</div>
 {% if corte_caja is not none and corte_caja.estatus == 0 %}
     {% if not necesita_corte.recolecta %}
     <div class="container row">
@@ -125,7 +132,7 @@
                 <div id="error_corte" style="color: red;"></div>
             </div>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary" id="btn_corte" disabled>Enviar</button>
+            <button type="submit" class="btn btn-primary" id="btn_corte" disabled>Iniciar corte de caja</button>
         </form>
     </div>
 </div>
