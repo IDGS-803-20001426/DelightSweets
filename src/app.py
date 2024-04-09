@@ -1,5 +1,5 @@
-from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort
-from flask_wtf.csrf import CSRFProtect
+from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort,session,request, make_response, jsonify
+from flask_wtf.csrf import CSRFProtect,generate_csrf
 from flask_wtf import FlaskForm
 from flask_mysqldb import MySQL
 from flask_login import LoginManager, login_user, logout_user, login_required,current_user
@@ -17,17 +17,20 @@ from markupsafe import Markup
 from permissions import permission_required
 from validaciones import validarPalabrasConsulta,validarFormulario,validarContrasenia,cargarContraseñasComunes,validarCamposLogin
 from datetime import datetime, timedelta
+from sqlalchemy.exc import SQLAlchemyError
 import re
 import forms
 import base64
 import json
 from sqlalchemy import func, asc
 import MySQLdb
-from flask_wtf.csrf import generate_csrf
-from sqlalchemy.exc import SQLAlchemyError
+import json
+
+
+
 
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta   
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -183,6 +186,8 @@ class ProveedorView(ModelView):
         validarFormulario(form_class, ['nombre','direccion', 'nombre_responsable'])
         
         return form_class
+
+
 #Clase Permiso ------------------------------------------------------------------------
 class PermisoView(ModelView):
     def is_accessible(self):
@@ -271,6 +276,57 @@ class SolicitudProduccionView(ModelView):
         model.estatus = 'Solicitada'
 
     can_edit = False
+    
+from flask_admin.base import BaseView
+from flask_admin import expose
+from datetime import datetime, timedelta
+import calendar
+import locale
+
+locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+
+class VentasView(BaseView):
+    @expose('/')
+    def index(self):
+        # Consulta las ventas por día desde tu base de datos usando SQLAlchemy
+        ventas_diarias = db.session.query(Venta.fecha_venta, db.func.sum(Venta.total)).group_by(Venta.fecha_venta).all()
+
+        # Formatea los datos de ventas diarias en un formato que pueda entender Chart.js
+        labels_diarias = [venta[0].strftime('%d/%m/%Y') for venta in ventas_diarias]  # Formato "01/05/2024"
+        data_diarias = [venta[1] for venta in ventas_diarias]
+
+        # Calcular la fecha de inicio de la semana actual y hace 6 semanas atrás
+        today = datetime.now()
+        start_of_current_week = today - timedelta(days=today.weekday())
+        start_of_6_weeks_ago = start_of_current_week - timedelta(weeks=6)
+        
+        # Consulta las ventas por semana desde tu base de datos usando SQLAlchemy
+        ventas_semanales = db.session.query(
+            db.func.year(Venta.fecha_venta).label('year'), 
+            db.func.week(Venta.fecha_venta).label('week'), 
+            db.func.sum(Venta.total)
+        ).filter(
+            Venta.fecha_venta >= start_of_6_weeks_ago,
+            Venta.fecha_venta <= start_of_current_week
+        ).group_by('year', 'week').all()
+
+        # Formatear los datos de ventas semanales en un formato que pueda entender Chart.js
+        labels_semanales = []
+        data_semanales = []
+        for venta in ventas_semanales:
+            # Generar la etiqueta de la semana (Año-Semana)
+            week_label = f"{venta.year}-W{venta.week}"
+            labels_semanales.append(week_label)
+            data_semanales.append(venta[2])  # Total de ventas por semana
+
+        # Renderizar el template con los datos
+        return self.render('ventas.html', 
+                           labels_diarias=labels_diarias, data_diarias=data_diarias,
+                           labels_semanales=labels_semanales, data_semanales=data_semanales)
+        
+admin.add_view(VentasView(name='Análisis de Ventas', menu_icon_type='fa', menu_icon_value='fa-bar-chart', endpoint='ventas'))
+
+
 
 @app.route('/ejecutar-consulta-adicional', methods=['POST'])
 def ejecutar_consulta_adicional():
@@ -896,6 +952,99 @@ def sanitizarDatos(inputString):
 
     return cadenaSanitizadda
 
+
+
+@app.route('/obtener_costo', methods=['POST'])
+def obtener_costo():
+    id_producto = request.form.get('id_producto')
+    print("idproducto------------------------------------>{}".format(id_producto))
+    # Obtén el costo de la materia prima desde la base de datos
+    costo = MateriaPrima.query.filter_by(id_materia=id_producto).first().costo
+    return jsonify({'costo': costo})
+
+# Define una clase Form personalizada para el formulario de compras
+class CompraForm(FlaskForm):
+    nombre_producto = SelectField('Nombre del Producto', coerce=int, validators=[DataRequired()])
+    cantidad = IntegerField('Cantidad', validators=[DataRequired()])
+    precio_compra = FloatField('Precio de Compra', validators=[DataRequired()])
+    fecha_compra = DateField('Fecha de Compra', validators=[DataRequired()])
+    fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
+    nombre_proveedor = SelectField('Nombre del Proveedor', coerce=int, validators=[DataRequired()])
+    costo_oculto = HiddenField('Costo Oculto')
+
+    def __init__(self, *args, **kwargs):
+        super(CompraForm, self).__init__(*args, **kwargs)
+        self.setup_choices()
+        self.setup_default_values()
+
+    def setup_choices(self):
+        # Consultar los nombres de productos disponibles en la base de datos
+        productos = MateriaPrima.query.all()
+        # Crear una lista de opciones para el campo de selección de productos
+        opciones_productos = [(producto.id_materia, producto.nombre) for producto in productos]
+        
+        # Establecer las opciones en el campo de selección de productos
+        self.nombre_producto.choices = opciones_productos 
+
+        # Consultar los nombres de proveedores disponibles en la base de datos
+        proveedores = Proveedor.query.all()
+        # Crear una lista de opciones para el campo de selección de proveedores
+        opciones_proveedores = [(proveedor.id_proveedor, proveedor.nombre) for proveedor in proveedores]
+        # Establecer las opciones en el campo de selección de proveedores
+        self.nombre_proveedor.choices = opciones_proveedores 
+
+    def setup_default_values(self):
+        # Establecer la fecha actual como valor predeterminado para la fecha de compra
+        self.fecha_compra.data = datetime.today().date()
+        # self.cantidad.data = 21
+
+# Define una clase ModelView personalizada para las compras
+
+class CompraView(ModelView):
+    form = CompraForm
+    column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
+    create_template = 'admin/create.html'
+ 
+
+    def on_model_change(self, form, model, is_created):
+        
+        # Obtener el nombre del producto seleccionado en el formulario
+        id_producto = form.nombre_producto.data
+        session['variable'] = True
+        nombre_producto = MateriaPrima.query.filter_by(id_materia=id_producto).first().nombre
+        
+        # Asignar el nombre del producto a la instancia del modelo Compra
+        model.nombre_producto = nombre_producto
+
+        # Obtener el nombre del proveedor seleccionado en el formulario
+        id_proveedor = form.nombre_proveedor.data
+        nombre_proveedor = Proveedor.query.filter_by(id_proveedor=id_proveedor).first().nombre
+        
+        # Asignar el nombre del proveedor a la instancia del modelo Compra
+        model.nombre_proveedor = nombre_proveedor
+
+        # Crear un nuevo registro en la tabla Inventario
+        inventario = Inventario(
+            id_materia=id_producto,
+            cantidad=form.cantidad.data,
+            fecha_caducidad=form.fecha_caducidad.data,
+            estatus=1,  # El valor de estatus es 1 según lo requerido
+            id_proveedor=id_proveedor
+        )
+        # Agregar el nuevo registro a la sesión
+        db.session.add(inventario)
+
+        # Obtener el objeto de materia prima correspondiente al producto comprado
+        materia_prima = MateriaPrima.query.get(id_producto)
+        prueba = request.cookies.get('pruebas')
+        if prueba == 'true':
+            total_costo = round(form.precio_compra.data / form.cantidad.data, 2)
+            materia_prima.costo = total_costo
+            db.session.commit()
+        # Mensaje de confirmación
+        flash('Se ha registrado la compra y actualizado el inventario y el costo de materia prima', 'success')
+
+
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
 # admin.add_view(RolView(Rol,db.session,category='Adm. Permisos ',name="Rol"))
@@ -924,7 +1073,8 @@ admin_blueprints = [
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
     MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
-    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias", menu_icon_value='fa-plus-square-o')
+    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"),
+    CompraView(Compra, db.session, menu_icon_type='fa', menu_icon_value='fa-shopping-cart', name="Compras")
 ]
 # Agrega tus blueprints a Flask-Admin
 for blueprint in admin_blueprints:
@@ -990,6 +1140,8 @@ def produccion():
         
         return jsonify({'exito': 'ok'})
     return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
+
+ 
 
 
 class ProduccionAdminView(BaseView):
