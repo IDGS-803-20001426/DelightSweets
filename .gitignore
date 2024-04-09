@@ -1,4 +1,5 @@
-
+.env
+/env/
 __pycache__/
 *.py[cod]
 tickets_de_venta
