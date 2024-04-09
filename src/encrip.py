@@ -35,7 +35,7 @@ def decrypt(encrypted_text):
 
 
 if __name__ == "__main__":
-    mensaje = "mysql+pymysql://root:@127.0.0.1/proyectGalleta"
+    mensaje = "mysql+pymysql://donGalleta:proyecto@127.0.0.1/proyectGalleta"
     clave = 3
 
     mensaje_encriptado = encrypt(mensaje, clave)
