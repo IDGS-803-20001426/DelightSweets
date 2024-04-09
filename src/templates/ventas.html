@@ -1,0 +1,88 @@
+{% import 'admin/layout.html' as layout with context -%}
+{% extends 'admin/base.html' %}
+{% block body %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Ventas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            width: 48%; /* Divide el ancho en dos columnas */
+            margin: 20px 1%; /* Espacio entre las columnas */
+            background-color: rgba(0, 0, 0, 0.7); /* Fondo oscuro */
+            border-radius: 10px; /* Bordes redondeados */
+            padding: 20px; /* Espaciado interno */
+            float: left; /* Alinea en dos columnas */
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+        h2 {
+            color: white; /* Color del texto */
+            text-align: center; /* Centra el título */
+        }
+    </style>
+</head>
+
+<div class="chart-container">
+    <h2>Ventas Diarias</h2>
+    <canvas id="ventasDiariasChart"></canvas>
+</div>
+
+<div class="chart-container">
+    <h2>Ventas Semanales</h2>
+    <canvas id="ventasSemanalesChart"></canvas>
+</div>
+  
+<script>
+    // Gráfico de Ventas Diarias
+    const ctxDiarias = document.getElementById('ventasDiariasChart');
+    new Chart(ctxDiarias, {
+        type: 'bar',
+        data: {
+            labels: {{ labels_diarias | tojson }},
+            datasets: [{
+                label: '# de Ventas Diarias',
+                data: {{ data_diarias | tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Gráfico de Ventas Semanales
+    const ctxSemanales = document.getElementById('ventasSemanalesChart');
+    new Chart(ctxSemanales, {
+        type: 'bar',
+        data: {
+            labels: {{ labels_semanales | tojson }},
+            datasets: [{
+                label: '# de Ventas Semanales',
+                data: {{ data_semanales | tojson }},
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock body%}
+s

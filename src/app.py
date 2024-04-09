@@ -1,4 +1,4 @@
-from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort,session,request, make_response
+from flask import Flask,Blueprint, render_template, request, redirect, url_for, flash,jsonify,abort,session,request, make_response, jsonify
 from flask_wtf.csrf import CSRFProtect
 from flask_wtf import FlaskForm
 from flask_mysqldb import MySQL
@@ -23,14 +23,13 @@ import base64
 import json
 from sqlalchemy import func, asc
 import MySQLdb
-
-
+import json
 
 
 
 
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra 
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta   
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -276,6 +275,57 @@ class SolicitudProduccionView(ModelView):
         model.estatus = 'Solicitada'
 
     can_edit = False
+    
+from flask_admin.base import BaseView
+from flask_admin import expose
+from datetime import datetime, timedelta
+import calendar
+import locale
+
+locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+
+class VentasView(BaseView):
+    @expose('/')
+    def index(self):
+        # Consulta las ventas por día desde tu base de datos usando SQLAlchemy
+        ventas_diarias = db.session.query(Venta.fecha_venta, db.func.sum(Venta.total)).group_by(Venta.fecha_venta).all()
+
+        # Formatea los datos de ventas diarias en un formato que pueda entender Chart.js
+        labels_diarias = [venta[0].strftime('%d/%m/%Y') for venta in ventas_diarias]  # Formato "01/05/2024"
+        data_diarias = [venta[1] for venta in ventas_diarias]
+
+        # Calcular la fecha de inicio de la semana actual y hace 6 semanas atrás
+        today = datetime.now()
+        start_of_current_week = today - timedelta(days=today.weekday())
+        start_of_6_weeks_ago = start_of_current_week - timedelta(weeks=6)
+        
+        # Consulta las ventas por semana desde tu base de datos usando SQLAlchemy
+        ventas_semanales = db.session.query(
+            db.func.year(Venta.fecha_venta).label('year'), 
+            db.func.week(Venta.fecha_venta).label('week'), 
+            db.func.sum(Venta.total)
+        ).filter(
+            Venta.fecha_venta >= start_of_6_weeks_ago,
+            Venta.fecha_venta <= start_of_current_week
+        ).group_by('year', 'week').all()
+
+        # Formatear los datos de ventas semanales en un formato que pueda entender Chart.js
+        labels_semanales = []
+        data_semanales = []
+        for venta in ventas_semanales:
+            # Generar la etiqueta de la semana (Año-Semana)
+            week_label = f"{venta.year}-W{venta.week}"
+            labels_semanales.append(week_label)
+            data_semanales.append(venta[2])  # Total de ventas por semana
+
+        # Renderizar el template con los datos
+        return self.render('ventas.html', 
+                           labels_diarias=labels_diarias, data_diarias=data_diarias,
+                           labels_semanales=labels_semanales, data_semanales=data_semanales)
+        
+admin.add_view(VentasView(name='Análisis de Ventas', menu_icon_type='fa', menu_icon_value='fa-bar-chart', endpoint='ventas'))
+
+
 
 
 class InventarioProductoTerminadoView(ModelView):

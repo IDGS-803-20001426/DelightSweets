@@ -3,7 +3,8 @@ from werkzeug.security import check_password_hash
 from flask_login import UserMixin
 import datetime
 from sqlalchemy.orm import relationship
-
+from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey  
+from sqlalchemy.orm import relationship
 db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
@@ -210,3 +211,21 @@ class MermaProduccion(db.Model):
     motivo = db.Column(db.String(250), nullable=False)
 
 
+class Venta(db.Model):
+    __tablename__ = 'venta'
+
+    id_venta = Column(Integer, primary_key=True)
+    fecha_venta = Column(DateTime, nullable=False)
+    total = Column(Float, nullable=False)  # Agregar columna para el total de la venta
+    detalles_venta = relationship('DetalleVenta', backref='venta')
+
+class DetalleVenta(db.Model):
+    __tablename__ = 'detalle_venta'
+
+    id_detalle = Column(Integer, primary_key=True)
+    id_venta = Column(Integer, ForeignKey('venta.id_venta'), nullable=False)
+    id_galleta = Column(Integer, ForeignKey('galleta.id_galleta'), nullable=False)
+    cantidad = Column(Integer, nullable=False)
+    total_detalle = Column(Float, nullable=False)
+
+    galleta = relationship('Galleta')
