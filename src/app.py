@@ -23,8 +23,8 @@ import base64
 import json
 from sqlalchemy import func, asc
 import MySQLdb
-
-
+from flask_wtf.csrf import generate_csrf
+from sqlalchemy.exc import SQLAlchemyError
 
 # Models:
 from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario
@@ -272,9 +272,88 @@ class SolicitudProduccionView(ModelView):
 
     can_edit = False
 
+@app.route('/ejecutar-consulta-adicional', methods=['POST'])
+def ejecutar_consulta_adicional():
+    data = request.get_json()  # Obtener los datos JSON enviados en el cuerpo de la solicitud
+    inventario_id = data.get('inventario_id')
 
-class InventarioProductoTerminadoView(ModelView):
-    
+    try:
+        inventario_prod_terminado = db.session.query(InventarioProductoTerminado).filter_by(id_inventario_prod_terminado=inventario_id).first()
+        nueva_merma = MermaProdTerminado(
+            id_inventario_prod_terminado=inventario_prod_terminado.id_inventario_prod_terminado,
+            cantidad=inventario_prod_terminado.cantidad,
+            fecha=datetime.now(),
+            motivo='Merma caducidad'
+        )
+
+        db.session.add(nueva_merma)
+
+        # Actualizar el estatus en el objeto InventarioProductoTerminado
+        inventario_prod_terminado.estatus = 0
+
+        # Confirmar la transacción
+        db.session.commit()
+
+        return jsonify({'message': 'Consulta adicional ejecutada correctamente'}), 200
+
+    except SQLAlchemyError as e:
+        # En caso de que ocurra una excepción de SQLAlchemy, deshacer la sesión y manejar el error
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+class InventarioProductoTerminadoView(ModelView):       
+    def _handle_view(self, name, **kwargs):
+        # Este método se ejecutará cada vez que un usuario acceda a esta vista
+        print("El usuario ha ingresado a la vista de InventarioProductoTerminado")
+        # Puedes agregar aquí cualquier otra acción que desees realizar, como ejecutar una consulta SQL
+        query = db.session.query(
+                    InventarioProductoTerminado.id_galleta,
+                    Galleta.nombre,
+                    func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
+                ) \
+                .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
+                .filter(InventarioProductoTerminado.estatus == 1) \
+                .group_by(
+                    InventarioProductoTerminado.id_galleta,
+                    Galleta.nombre
+                )
+        
+        # Ejecutar la consulta y obtener los resultados
+        results = query.all()
+        
+        mensaje = '¡Galletas con stock bajo! '
+        cont = 0
+
+        # Haz lo que necesites con los resultados
+        # Iterar sobre los resultados
+        for row in results:
+            # Verificar si el campo cantidad es menor a 10
+            if row.cantidad < 10:
+                # Mostrar un mensaje en la vista
+                mensaje += f"{row.nombre} - {row.cantidad}pz, "
+                cont = cont + 1
+        
+        if cont > 0:
+            mensaje += f". Le sugerimos realizar una solicitud de producción."
+            flash(mensaje, 'warning')
+
+        # Calcular la fecha dos semanas y un día atrás
+        fecha_dos_semanas_un_dia_atras = datetime.now() - timedelta(days=15)
+
+        # Realizar la consulta
+        resultados = db.session.query(InventarioProductoTerminado, Galleta)\
+                     .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta)\
+                     .filter(InventarioProductoTerminado.estatus == 1)\
+                     .filter(InventarioProductoTerminado.fecha_produccion <= fecha_dos_semanas_un_dia_atras).all()
+        
+        for r in resultados:
+            #flash(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}.", "warning")
+            # Generar una URL con los IDs de inventario como parámetros
+            url_ejecutar_consulta_adicional = url_for('ejecutar_consulta_adicional', ids_inventario=','.join(str(r.InventarioProductoTerminado.id_inventario_prod_terminado) for r in resultados))
+
+            token_csrf = generate_csrf()  # Generar el token CSRF
+            flash(Markup(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}. <form id='miFormulario'><input type='hidden' name='csrf_token' value='{token_csrf}'><input type='hidden' name='idInventario' value='{r.InventarioProductoTerminado.id_inventario_prod_terminado}'><button type='submit' class='btn btn-primary' id='registro_merma'>Mover lote a merma</button></form>"), 'error')
+
     def _format_image(view, context, model, name):
         if model.imagen:
             return Markup(f'<img width="80" height="80" src="{model.imagen}"></img>')

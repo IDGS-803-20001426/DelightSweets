@@ -51,8 +51,7 @@
   </link>
 
   <!-- SweetAlert -->
-  <link href="{{url_for('static',filename='libraries/SweetAlert/sweetalert.min.css')}}"
-  rel="stylesheet">
+  <link href="{{url_for('static',filename='libraries/SweetAlert/sweetalert.min.css')}}" rel="stylesheet">
   </link>
 
   <!-- Flask-admin admin styles -->
@@ -73,8 +72,8 @@
 
 </head>
 
-<body class="hold-transition skin-blue sidebar-mini">
 
+<body class="hold-transition skin-blue sidebar-mini">
   {% block page_body %}
   <div class="modal fade" id="cantidadModal" tabindex="-1" role="dialog" aria-labelledby="cantidadModalLabel"
     aria-hidden="true">
@@ -107,7 +106,6 @@
 
             </tbody>
           </table>
-
 
         </div>
         {% if form %}
@@ -214,7 +212,7 @@
       {% set render_ctx = h.resolve_ctx() %}
       <div class="container">
         {% block body %}
-  
+
         {% endblock body %}
       </div>
       {% if current_user.is_authenticated %}
@@ -302,35 +300,39 @@
   {% endif %}
   <script>
     function confirmDelete(url) {
-      
+
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
-            var deleteButtons = document.querySelectorAll('.fa-trash'); // Esto seleccionará todos los iconos de basura (suponiendo que Flask-Admin use FontAwesome para los botones de eliminar)
-            deleteButtons.forEach(function(icon) {
-                icon.addEventListener('click', function(event) {
-                    event.preventDefault(); // Evita el comportamiento predeterminado de eliminar
-                    Swal.fire({
-        title: '¿Estás seguro?',
-        text: '¡No podrás deshacer esta acción!',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Sí, eliminarlo!',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // Si el usuario confirma, envía la solicitud de eliminación
-          var deleteButton = icon.parentElement; // Obtener el elemento padre del icono (probablemente el botón de eliminar)
-                        deleteButton.click(); // Simula el clic en el botón para ejecutar la función original de eliminar
-        }
-      });
+    document.addEventListener("DOMContentLoaded", function () {
+      var deleteButtons = document.querySelectorAll(
+        '.fa-trash'
+      ); // Esto seleccionará todos los iconos de basura (suponiendo que Flask-Admin use FontAwesome para los botones de eliminar)
+      deleteButtons.forEach(function (icon) {
+        icon.addEventListener('click', function (event) {
+          event.preventDefault(); // Evita el comportamiento predeterminado de eliminar
+          Swal.fire({
+            title: '¿Estás seguro?',
+            text: '¡No podrás deshacer esta acción!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sí, eliminarlo!',
+            cancelButtonText: 'Cancelar'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              // Si el usuario confirma, envía la solicitud de eliminación
+              var deleteButton = icon
+                .parentElement; // Obtener el elemento padre del icono (probablemente el botón de eliminar)
+              deleteButton
+                .click(); // Simula el clic en el botón para ejecutar la función original de eliminar
+            }
+          });
 
 
-                });
-            });
         });
+      });
+    });
 
     $(document).ready(function () {
       // Aplicar Select2 a todos los campos de selección múltiple
@@ -353,7 +355,7 @@
         $("#select_materia_individual, label[for='select_materia_individual']").closest('.form-group').css(
           "display", "none");
         $("#cantidad_merma_materia").closest('.form-group').css("display", "none");
-      } else if(tipoMermaMateria == '2') {
+      } else if (tipoMermaMateria == '2') {
         $("#select_materia_lote, label[for='select_materia_lote']").closest('.form-group').css("display", "none");
         $("#cantidad_merma_materia").closest('.form-group').css("display", "block");
       }
@@ -404,9 +406,9 @@
         $(this).find('td').each(function (colIndex) {
           console.log($('#tableMaterias thead th').eq(colIndex).text())
           var nombreColumna = $('#tableMaterias thead th').eq(colIndex)
-        .text(); // Obtener el nombre de la columna
+            .text(); // Obtener el nombre de la columna
           fila[nombreColumna] = $(this)
-        .text(); // Asignar el texto de la celda al objeto de fila usando el nombre de la columna como clave
+            .text(); // Asignar el texto de la celda al objeto de fila usando el nombre de la columna como clave
         });
         // Agregar el objeto de fila al arreglo de datos
         datos.push(fila);
@@ -416,6 +418,52 @@
 
       $('#cantidadModal').modal('hide');
     }
+
+    $(document).on('submit', '#miFormulario', function (event) {
+      event.preventDefault(); // Evitar el envío del formulario por defecto
+
+      let id_inventario = $("input[name=idInventario]").val();
+      let csrf_token = $("input[name=csrf_token]").val(); // Obtener el valor del token CSRF del formulario
+
+      // Hacer una solicitud fetch a la ruta de Flask
+      fetch('/ejecutar-consulta-adicional', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          },
+          body: JSON.stringify({
+            inventario_id: id_inventario
+          })
+        })
+        .then(response => {
+          console.log(response)
+          if (response.ok) {
+            // La solicitud se completó con éxito
+            // Realizar cualquier acción adicional necesaria
+            Swal.fire({
+                title: "Éxito!",
+                text: "El lote se registró como merma!",
+                icon: "success"
+            }).then((result) => {
+                // Recargar la página
+                window.location.reload();
+            });
+          } else {
+            // La solicitud falló
+            Swal.fire({
+              title: "Error!",
+              text: "Ocurrió un error al realizar el movimiento!",
+              icon: "error"
+            });
+          }
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+    });
+
 
     $("#registrarMateria").click(function () {
       $("#error-cantidad").html("");
