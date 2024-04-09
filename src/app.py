@@ -35,9 +35,19 @@ from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
 from models.produccionDao import ProduccionDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO
 from config import DevelopmentConfig
 
-
+# PDF
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
+from flask import send_file
+from reportlab.lib.styles import getSampleStyleSheet
+import os
+from datetime import datetime
+import base64
 
 app = Flask(__name__)
 app.config.from_object(DevelopmentConfig)
@@ -1364,6 +1374,295 @@ def home():
     return redirect('/admin')
     
 
+
+@app.route('/finalizarCorte', methods=["GET", "POST"])
+def finalizarCorte():
+    
+    if request.method == "POST":
+        id_corte_caja = request.form['id_corte_caja']
+        fecha_de_termino = datetime.now().date()
+        hora_termino = datetime.now().time()
+        VentaDelDía = 0
+        monto_retiro_total = 0
+        
+        try:
+            CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
+            cortes = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
+            for corte in cortes:
+                total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
+                corte['total_venta'] = total
+                VentaDelDía += total
+            
+            retiros = RetiroDAO.consultar_por_id_corte_caja(id_corte_caja)
+            for retiro in retiros:
+                monto_retiro_total += retiro['monto']
+
+            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total)
+        
+        except Exception as ex:
+            print("Error al finalizar el corte de caja:", ex)
+        
+    return render_template('ventas/corteCaja.html')
+
+
+
+@app.route('/ventas_recolecta', methods=["GET", "POST"])
+def ventasRecolecta():
+    galletas = GalletaDAO.get_costo_galletas()
+    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+    
+    if request.method == "POST":
+        id_usuario = request.form.get('numero_empleado')
+        monto = request.form.get('monto_retirar')
+        fecha_hora = datetime.now()
+        insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']))
+    
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+
+@app.route('/ventas_diarias', methods=["GET", "POST"])
+def ventasCorte():
+    galletas = GalletaDAO.get_costo_galletas()
+    
+    if request.method == "POST":
+        id_usuario = request.form.get('numero_empleado')
+        fecha_de_inicio = datetime.now().date()
+        hora_inicio = datetime.now().time()
+        fecha_de_termino = None
+        hora_termino = None
+        estatus = 0
+
+        id_corte_caja = CorteCajaDAO.insertar_corte_caja(
+            fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario
+        )
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+
+    else:
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()        
+    
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+
+
+@app.route('/ventas', methods=["GET", "POST"])
+def ventas():
+    galletas = GalletaDAO.get_costo_galletas()
+    # print(galletas)
+    corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+    # print(necesita_corte)
+
+    if request.method == "POST":
+        datos_orden = request.json.get('orden_venta')
+
+        fecha_venta = datetime.now().date()
+        hora_venta = datetime.now().time()
+        
+        try:
+            id_venta = insertar_venta(datos_orden, fecha_venta, hora_venta)
+            insertar_corte_venta(id_venta, int(corte_caja['id_corte_caja']))
+            descontar_inventario(datos_orden)
+            pdf_base64 = generar_pdf_ventas(datos_orden, fecha_venta, id_venta)
+            
+            resultado_venta = {
+                'success': True, 
+                'message': 'Venta registrada exitosamente',
+                'pdf_base64': pdf_base64,  
+                'id_venta': id_venta 
+            }
+
+            return jsonify(resultado_venta)
+        except Exception as ex:
+            resultado_venta = {
+                'success': False, 
+                'message': 'Error al registrar la venta',
+                'error': str(ex)
+            }
+            return jsonify(resultado_venta)
+
+    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
+
+# -------------- INSERTAR RETIRO --------------
+def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
+    try:
+        RetiroDAO.insertar_retiro(fecha_hora, monto, 'recolecta',id_corte_caja,id_usuario)
+        CorteCajaVentaDAO.actualizar_estatus(id_corte_caja)
+        return 
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERTAR RETIRO --------------
+
+# -------------- REQUIERE CORTE --------------
+def verificar_corte(id_corte_caja):
+    try:
+        cortes = CorteCajaVentaDAO.consultar_por_id_corte_caja(id_corte_caja)
+        total_ventas = 0 
+
+        for corte in cortes:
+            id_venta = corte['id_venta']
+            total_venta = VentaDAO.obtener_total_por_id_venta(id_venta)
+            total_ventas += total_venta 
+
+        total_ventas = round(total_ventas, 2)
+
+        recolecta = total_ventas > 500
+        resultado = {'dinero_en_caja': total_ventas, 'recolecta': recolecta}
+
+        return resultado
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- REQUIERE CORTE --------------
+
+# -------------- INSERT DE CORTE --------------
+def insertar_corte_venta(id_venta, id_corte_caja):
+    try:
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        CorteCajaVentaDAO.insertar_corte_caja_venta(id_venta, id_corte_caja,1)
+        
+        return
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERT DE CORTE --------------
+
+# -------------- INSERT DE VENTA --------------
+def insertar_venta(datos_orden, fecha_venta, hora_venta):
+    try:
+
+        subtotal = sum(galleta['costo'] for galleta in datos_orden)
+        impuesto = subtotal * 0.16
+        total = subtotal + impuesto
+        
+        id_venta = VentaDAO.insert_venta(fecha_venta, hora_venta, subtotal, total)        
+
+        for galleta in datos_orden:
+            id_galleta = galleta['id_galleta']
+            medida = galleta['medida']
+            cantidad = galleta['cantidad']
+            total_detalle = round(galleta['costo'], 2)
+            
+            if medida == 'gramos' or medida == 'piezas':
+                DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, medida, cantidad, total_detalle)
+            else:
+                cantidad_en_gramos = int(medida) * cantidad if medida.isdigit() else 0
+                DetalleVentaDAO.insert_detalle_venta(id_venta, id_galleta, 'gramos', cantidad_en_gramos, total_detalle)
+
+        
+        return id_venta  
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- INSERT DE VENTA --------------
+
+# -------------- DESCONTAR INVENTARIO --------------
+def descontar_inventario(datos_orden):
+    try:
+        for orden in datos_orden:
+            id_galleta = orden['id_galleta']
+            medida = orden['medida']
+            cantidad = int(orden['cantidad'])
+            gramos_por_pieza = float(orden['gramos_por_pieza'])
+                
+            if medida == 'gramos':
+                cantidad = int(cantidad / gramos_por_pieza)
+            elif medida == 'piezas':
+                pass
+            else:
+                medida_entero = int(medida)
+                cantidad = int(medida_entero * cantidad / gramos_por_pieza)
+
+            registros_mas_antiguos = InventarioProductoTerminadoDAO.obtener_registros_mas_antiguos(id_galleta)
+
+            for registro in registros_mas_antiguos:
+                if cantidad <= registro['cantidad']:
+                    registro['cantidad'] -= cantidad
+                    if registro['cantidad'] == 0:
+                        registro['estatus'] = 0
+                    InventarioProductoTerminadoDAO.actualizar_registro(registro['id_inventario_prod_terminado'], {'cantidad': registro['cantidad'], 'estatus': registro['estatus']})
+                    break
+                else:
+                    cantidad -= registro['cantidad']
+                    registro['cantidad'] = 0
+                    registro['estatus'] = 0
+                    InventarioProductoTerminadoDAO.actualizar_registro(registro['id_inventario_prod_terminado'], {'cantidad': registro['cantidad'], 'estatus': registro['estatus']})
+                    
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- DESCONTAR INVENTARIO --------------
+
+# -------------- GENERACIÓN DEL PDF --------------
+def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
+    subtotal = 0
+    
+    for galleta in orden_venta:
+        subtotal += galleta['costo']
+
+    now = datetime.now()
+    pdf_filename = f"ticket_venta_{id_venta}_{fecha_venta}.pdf"
+    
+    folder_path = os.path.join(os.getcwd(),"tickets_de_venta")
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    pdf_path = os.path.join(folder_path, pdf_filename)
+    
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    elements = []
+
+    logo_path = os.path.join(os.getcwd(), 'static', 'img', 'logo.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=100, height=100)
+        logo.hAlign = 'LEFT'
+        elements.append(logo)
+        elements.append(Spacer(1, 20))
+
+    style = getSampleStyleSheet()['Title']
+    elements.append(Paragraph("DelightSweets", style))
+
+    data = [["Producto", "Cantidad", "Medida", "Costo"]]
+    for galleta in orden_venta:
+        medida_texto = galleta['medida']
+        if galleta['medida'] not in ['piezas', 'gramos']:
+            medida_texto = f"Paquete de {galleta['medida']} gramos"
+        data.append([galleta['nombre'], str(galleta['cantidad']), medida_texto, f"${round(galleta['costo'], 2)}"])
+    table = Table(data)
+    table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                               ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                               ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                               ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                               ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                               ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                               ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+    elements.append(table)
+
+    elements.append(Paragraph(f"<b>Subtotal:</b> ${round(subtotal, 2)}", style))
+
+    impuesto = round(subtotal * 0.16, 2)
+    elements.append(Paragraph(f"<b>Impuesto (16%):</b> ${impuesto}", style))
+
+    total = round(subtotal + impuesto, 2)
+    elements.append(Paragraph(f"<b>Total:</b> ${total}", style))
+
+    gracias_style = getSampleStyleSheet()['Normal']
+
+    gracias_style.fontSize = 20
+    gracias_style.fontName = 'Helvetica-Bold'
+    gracias_style.textColor = colors.brown
+    gracias_style.alignment = 1
+
+    elements.append(Paragraph("Gracias por su compra", gracias_style))
+
+    doc.build(elements)
+
+    with open(pdf_path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    return pdf_base64
+
+# -------------- GENERACIÓN DEL PDF --------------
+
+
 #Verificar permiso acceso módulos ------------------------------
 def verificarPermisoUsuario(usuario_id, permiso, db):
     if current_user.is_authenticated:
@@ -1376,6 +1675,7 @@ def verificarPermisoUsuario(usuario_id, permiso, db):
         if permiso in permissions: 
             return True
     return False
+
 #Cerrar Sesión --------------------------------------------------
 @app.route('/logout')
 def logout():
