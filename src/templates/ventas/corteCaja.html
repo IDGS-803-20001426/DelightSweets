@@ -5,6 +5,7 @@
 {% block body %}
 <body>
     <div class="container">
+        {% if cortes %}
         <h1 class="text-center mt-5">Cortes de Caja Totales</h1>
 
         <div class="text-center mb-3">
@@ -72,7 +73,25 @@
             <form action="/ventas" method="get">
                 <button type="submit" class="btn btn-primary">Regresar</button>
             </form>
+            {% if pdf_base64 %}
+            <br>
+            <form action="/descargarPDF" method="post">
+                <input type="hidden" name="pdf_base64" value="{{ pdf_base64 }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success">Descargar PDF</button>
+            </form>
+            {% endif %}
         </div>
+        {% else %}
+        <div class="text-center mt-3">
+            <p>No es posible visualizar el corte del día.</p>
+        </div>
+        <div class="text-center mt-3">
+            <form action="/ventas" method="get">
+                <button type="submit" class="btn btn-primary">Regresar</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 </body>
 {% endblock %}
