@@ -25,7 +25,11 @@ import json
 from sqlalchemy import func, asc
 import MySQLdb
 import json
-
+from flask_admin.form import FormOpts
+from flask_admin.helpers import (get_form_data, validate_form_on_submit,
+                                 get_redirect_target, flash_errors)
+from flask_admin.babel import gettext, ngettext
+from helpers import prettify_name, get_mdict_item_or_list
 
 
 
@@ -80,6 +84,10 @@ admin = Admin(
 #Clase Usuarios ------------------------------------------------------------------------
 
 class UserView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     column_exclude_list = ('contrasenia')  # No muestra en la tabla lista
     form_excluded_columns = ('fecha_password')  # Campos Excluidos de los formularios
 
@@ -149,12 +157,148 @@ class UserView(ModelView):
     column_labels = {'rol': 'Rol'} # Etiqueta personalizada para la columna 'rol'   
     column_descriptions = {'rol': 'Nombre del rol'} # Descripción de la columna 'rol'
     column_default_sort = ('id_usuario', True) # Orden predeterminado de la tabla por la columna 'id_usuario' en orden descendente
+
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 #Clase Permisos Rol ------------------------------------------------------------------------
 class PermisoRolCreateForm(FlaskForm):
     id_rol = SelectField('Rol', choices=[], validators=[DataRequired()])
     id_permiso = SelectField('Permiso', choices=[], validators=[DataRequired()])
 
 class PermisoRolView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = PermisoRolCreateForm
     column_formatters = dict(
         rol=lambda v, c, m, p: m.rol.nombre,
@@ -179,8 +323,143 @@ class PermisoRolView(ModelView):
         form.id_permiso.choices = [(str(permiso.id_permiso), permiso.permiso) for permiso in Permiso.query.all()]
         return form
     
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
+    
 #Clase Proveedores ------------------------------------------------------------------------
 class ProveedorView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
     def is_accessible(self):
         permiso = 3
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -197,9 +476,144 @@ class ProveedorView(ModelView):
         
         return form_class
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 #Clase Permiso ------------------------------------------------------------------------
 class PermisoView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     def is_accessible(self):
         permiso = 2
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -208,9 +622,144 @@ class PermisoView(ModelView):
         # Validaciones Personalizadas Ataques
         validarFormulario(form_class, ['permiso'])
         return form_class
+    
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 #Clase Rol ------------------------------------------------------------------------
 class RolView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
     def is_accessible(self):
         permiso = 2
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -220,14 +769,282 @@ class RolView(ModelView):
         # Validaciones Personalizadas Ataques
         validarFormulario(form_class, ['nombre'])
         return form_class
+    
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 #Clase MateriaPrima ------------------------------------------------------------------------
 class MateriaPrimaView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+    
     def is_accessible(self):
         permiso = 5
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     can_edit = False
     can_delete = False
     can_create = False    
+
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 
 class SolicitudProduccionForm(FlaskForm):
@@ -250,6 +1067,10 @@ class SolicitudProduccionForm(FlaskForm):
         return True
 
 class SolicitudProduccionView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = SolicitudProduccionForm
    
     column_formatters = {
@@ -286,6 +1107,138 @@ class SolicitudProduccionView(ModelView):
         model.estatus = 'Solicitada'
 
     can_edit = False
+
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
     
 from flask_admin.base import BaseView
 from flask_admin import expose
@@ -367,7 +1320,10 @@ def ejecutar_consulta_adicional():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-class InventarioProductoTerminadoView(ModelView):       
+class InventarioProductoTerminadoView(ModelView): 
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'      
     def _handle_view(self, name, **kwargs):
         # Este método se ejecutará cada vez que un usuario acceda a esta vista
         print("El usuario ha ingresado a la vista de InventarioProductoTerminado")
@@ -470,12 +1426,148 @@ class InventarioProductoTerminadoView(ModelView):
     can_edit = False
     can_delete = False
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
+
 class GalletaForm(FlaskForm):
     nombre = StringField('Nombre', validators=[DataRequired()])
     porcentaje_ganancia = FloatField('Porcentaje de Ganancia', validators=[DataRequired()])
     imagen = FileUploadField('Imagen', base_path="./src/static/img/galletas")
 
 class GalletaView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form=GalletaForm
     
     column_list = ('imagen', 'nombre', 'porcentaje_ganancia', 'costo_total_materias_primas', 'precio_final', 'utilidad')
@@ -544,6 +1636,138 @@ class GalletaView(ModelView):
         'utilidad': get_utilidad 
     }
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
+
 
 @app.route('/materias_primas')
 def obtener_materias_primas():
@@ -572,6 +1796,10 @@ class RecetaForm(FlaskForm):
         self.id_galleta.choices = [(galleta.id_galleta, galleta.nombre) for galleta in Galleta.query.all()]
 
 class RecetaView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = RecetaForm
     form_columns = ('btn_materia')
     def is_accessible(self):
@@ -680,6 +1908,138 @@ class RecetaView(ModelView):
         # Confirmar los cambios para guardar los objetos en la base de datos
         db.session.commit()
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
+
 class MermaProdTerminadoForm(FlaskForm):
     tipo_merma = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='2', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
     select_galleta_individual = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
@@ -752,6 +2112,10 @@ class MermaProdTerminadoForm(FlaskForm):
         return True
 
 class MermaProdTerminadoView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = MermaProdTerminadoForm
     column_list = ('galleta', 'cantidad', 'fecha', 'motivo')
 
@@ -814,6 +2178,139 @@ class MermaProdTerminadoView(ModelView):
 
             if is_created:
                 model.id_inventario_prod_terminado = inventarios[0].id_inventario_prod_terminado
+    
+    
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 class MermaProduccionForm(FlaskForm):
     tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='2', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
@@ -883,6 +2380,10 @@ class MermaProduccionForm(FlaskForm):
         return True
     
 class MermaProduccionView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = MermaProduccionForm
 
     column_list = ('id_materia', 'cantidad', 'fecha', 'motivo')
@@ -946,6 +2447,137 @@ class MermaProduccionView(ModelView):
                     inventario.cantidad -= cantidad_merma
                     break
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 
 
@@ -1011,6 +2643,10 @@ class CompraForm(FlaskForm):
 # Define una clase ModelView personalizada para las compras
 
 class CompraView(ModelView):
+    create_template = 'admin/traducciones/create_general.html'
+    list_template = 'admin/traducciones/list_general.html'
+    edit_template = 'admin/traducciones/edit_general.html'
+
     form = CompraForm
     column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
     create_template = 'admin/create.html'
@@ -1054,6 +2690,137 @@ class CompraView(ModelView):
         # Mensaje de confirmación
         flash('Se ha registrado la compra y actualizado el inventario y el costo de materia prima', 'success')
 
+    @expose('/new/', methods=('GET', 'POST'))
+    def create_view(self):
+        """
+            Create model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_create:
+            return redirect(return_url)
+
+        form = self.create_form()
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_create_rules, form=form)
+
+        if self.validate_form(form):
+            # in versions 1.1.0 and before, this returns a boolean
+            # in later versions, this is the model itself
+            model = self.create_model(form)
+            if model:
+                flash(gettext('Registro guardado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(request.url)
+                elif '_continue_editing' in request.form:
+                    # if we have a valid model, try to go to the edit view
+                    if model is not True:
+                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
+                    else:
+                        url = return_url
+                    return redirect(url)
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=True))
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_create_rules)
+
+        if self.create_modal and request.args.get('modal'):
+            template = self.create_modal_template
+        else:
+            template = self.create_template
+
+        return self.render(template,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    
+    @expose('/edit/', methods=('GET', 'POST'))
+    def edit_view(self):
+        """
+            Edit model view
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_edit:
+            return redirect(return_url)
+
+        id = get_mdict_item_or_list(request.args, 'id')
+        if id is None:
+            return redirect(return_url)
+
+        model = self.get_one(id)
+
+        if model is None:
+            flash(gettext('El registro no existe.'), 'error')
+            return redirect(return_url)
+
+        form = self.edit_form(obj=model)
+        if not hasattr(form, '_validated_ruleset') or not form._validated_ruleset:
+            self._validate_form_instance(ruleset=self._form_edit_rules, form=form)
+
+        if self.validate_form(form):
+            if self.update_model(form, model):
+                flash(gettext('Registro modificado exitosamente.'), 'success')
+                if '_add_another' in request.form:
+                    return redirect(self.get_url('.create_view', url=return_url))
+                elif '_continue_editing' in request.form:
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model)))
+                else:
+                    # save button
+                    return redirect(self.get_save_return_url(model, is_created=False))
+
+        if request.method == 'GET' or form.errors:
+            self.on_form_prefill(form, id)
+
+        form_opts = FormOpts(widget_args=self.form_widget_args,
+                             form_rules=self._form_edit_rules)
+
+        if self.edit_modal and request.args.get('modal'):
+            template = self.edit_modal_template
+        else:
+            template = self.edit_template
+
+        return self.render(template,
+                           model=model,
+                           form=form,
+                           form_opts=form_opts,
+                           return_url=return_url)
+    @expose('/delete/', methods=('POST',))
+    def delete_view(self):
+        """
+            Delete model view. Only POST method is allowed.
+        """
+        return_url = get_redirect_target() or self.get_url('.index_view')
+
+        if not self.can_delete:
+            return redirect(return_url)
+
+        form = self.delete_form()
+
+        if self.validate_form(form):
+            # id is InputRequired()
+            id = form.id.data
+
+            model = self.get_one(id)
+
+            if model is None:
+                flash(gettext('El registro no existe'), 'error')
+                return redirect(return_url)
+
+            # message is flashed from within delete_model if it fails
+            if self.delete_model(model):
+                count = 1
+                flash(
+                    ngettext('Registro eliminado exitosamente.',
+                             '%(count)s registros eliminados exitosamente.',
+                             count, count=count), 'success')
+                return redirect(return_url)
+        else:
+            flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
+
+        return redirect(return_url)
 
 #### Añadir views to admin --------------------------------------------------------------------------------------
 # admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))

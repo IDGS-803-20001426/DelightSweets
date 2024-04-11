@@ -1,0 +1,26 @@
+{% extends 'admin/master.html' %}
+{% import 'admin/traducciones/lib.html' as lib with context %}
+{% from 'admin/traducciones/lib.html' import extra with context %} {# backward compatible #}
+
+{% block body %}
+<!-- {{ super() }} -->
+{% block navlinks %}
+<ul class="nav nav-tabs">
+    <li>
+        <a href="{{ return_url }}">{{ _gettext('Listado') }}</a>
+    </li>
+    <li class="active">
+        <a href="javascript:void(0)">{{ _gettext('Registrar') }}</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block create_form %}
+    {{ lib.render_form(form, return_url, extra(), form_opts) }}
+{% endblock %}
+
+{% endblock body %}
+
+{% block tail %}
+{{ super() }}
+{% endblock tail %}
