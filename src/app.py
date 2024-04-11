@@ -128,7 +128,7 @@ def finalizarCorte():
         monto_retiro_total = 0
         
         try:
-            # CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
+            CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
             cortes = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
             for corte in cortes:
                 total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
