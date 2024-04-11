@@ -136,10 +136,10 @@ body {
 }
 
 .btn_terminar_corte {
-  position: fixed;
+  /* position: fixed;
   top: 5px;
   z-index: 999;
-  right: 5px;
+  right: 5px; */
 }
 
 
