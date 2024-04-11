@@ -87,6 +87,7 @@ class Compra(db.Model):
     fecha_compra = db.Column(db.Date, nullable=False)
     fecha_caducidad = db.Column(db.Date, nullable=False)
     nombre_proveedor = db.Column(db.String(200), nullable=False)
+    tipo_medida = db.Column(db.Integer,nullable=False)
 
 class Galleta(db.Model):
     __tablename__ = 'galleta'
@@ -217,6 +218,7 @@ class MateriaPrima(db.Model):
     id_materia = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
     nombre = db.Column(db.String(100), nullable=False)
     costo = db.Column(db.Float, nullable=True)
+    tipo_medida = db.Column(db.Integer,nullable=False)
     # Relación de muchos a muchos con Receta a través de RecetaMateriaIntermedia
     recetas = db.relationship("Receta", secondary='receta_materia_intermedia', back_populates='materias')
     inventariosMateria = relationship('Inventario', backref='materia_prima')
@@ -302,3 +304,15 @@ class Retiro(db.Model):
         self.motivo = motivo
         self.id_corte_caja = id_corte_caja
         self.id_usuario = id_usuario
+
+
+class EquivalenciaMedida(db.Model):
+    __tablename__ = 'equivalencia_medida'
+
+    id_equivalencia = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    unidad = db.Column(db.String(100), nullable=False)
+    tipo_medida = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, unidad, tipo_medida):
+        self.unidad = unidad
+        self.tipo_medida = tipo_medida

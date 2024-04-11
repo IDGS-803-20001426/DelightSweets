@@ -2604,12 +2604,24 @@ def obtener_costo():
     costo = MateriaPrima.query.filter_by(id_materia=id_producto).first().costo
     return jsonify({'costo': costo})
 
+
+
+
+
+
+
+
+
+
 # Define una clase Form personalizada para el formulario de compras
+from wtforms import ValidationError
+from wtforms.validators import InputRequired, NumberRange
+
 class CompraForm(FlaskForm):
     nombre_producto = SelectField('Nombre del Producto', coerce=int, validators=[DataRequired()])
-    cantidad = IntegerField('Cantidad', validators=[DataRequired()])
-    precio_compra = FloatField('Precio de Compra', validators=[DataRequired()])
-    fecha_compra = DateField('Fecha de Compra', validators=[DataRequired()])
+    cantidad = IntegerField('Cantidad', validators=[InputRequired(message="Debe ingresar una cantidad válida."), NumberRange(min=1, message="La cantidad debe ser mayor que cero.")])
+    precio_compra = FloatField('Precio de Compra', validators=[InputRequired(message="Debe ingresar un precio válido."), NumberRange(min=0.01, message="El precio debe ser mayor que cero.")])
+    fecha_compra = HiddenField('Fecha de Compra')
     fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
     nombre_proveedor = SelectField('Nombre del Proveedor', coerce=int, validators=[DataRequired()])
     costo_oculto = HiddenField('Costo Oculto')
@@ -2624,7 +2636,8 @@ class CompraForm(FlaskForm):
         productos = MateriaPrima.query.all()
         # Crear una lista de opciones para el campo de selección de productos
         opciones_productos = [(producto.id_materia, producto.nombre) for producto in productos]
-        
+        # Inserta una opción de "elige una opción" como el primer elemento
+        opciones_productos.insert(0, (-1, 'Elige una opción'))
         # Establecer las opciones en el campo de selección de productos
         self.nombre_producto.choices = opciones_productos 
 
@@ -2632,16 +2645,41 @@ class CompraForm(FlaskForm):
         proveedores = Proveedor.query.all()
         # Crear una lista de opciones para el campo de selección de proveedores
         opciones_proveedores = [(proveedor.id_proveedor, proveedor.nombre) for proveedor in proveedores]
+        # Inserta una opción de "elige una opción" como el primer elemento
+        opciones_proveedores.insert(0, (-1, 'Elige una opción'))
         # Establecer las opciones en el campo de selección de proveedores
         self.nombre_proveedor.choices = opciones_proveedores 
 
     def setup_default_values(self):
         # Establecer la fecha actual como valor predeterminado para la fecha de compra
         self.fecha_compra.data = datetime.today().date()
-        # self.cantidad.data = 21
+
+    def validate_fecha_caducidad(form, field):
+        if field.data <= datetime.today().date():
+            raise ValidationError('La fecha de caducidad debe ser posterior al día actual.')
+
+    def validate(self):
+        if not super(CompraForm, self).validate():
+            return False
+
+        # Verificar si se seleccionó una opción válida en el campo de nombre del producto
+        if self.nombre_producto.data == -1:
+            self.nombre_producto.errors.append('Debes seleccionar un producto.')
+            return False
+
+        # Verificar si se seleccionó una opción válida en el campo de nombre del proveedor
+        if self.nombre_proveedor.data == -1:
+            self.nombre_proveedor.errors.append('Debes seleccionar un proveedor.')
+            return False
+
+        # Verificar que la fecha de compra no sea anterior a la fecha actual
+        if self.fecha_compra.data < datetime.today().date():
+            self.fecha_compra.errors.append('La fecha de compra no puede ser anterior a la fecha actual.')
+            return False
+        
+        return True
 
 # Define una clase ModelView personalizada para las compras
-
 class CompraView(ModelView):
     create_template = 'admin/traducciones/create_general.html'
     list_template = 'admin/traducciones/list_general.html'
@@ -2651,9 +2689,7 @@ class CompraView(ModelView):
     column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
     create_template = 'admin/create.html'
  
-
     def on_model_change(self, form, model, is_created):
-        
         # Obtener el nombre del producto seleccionado en el formulario
         id_producto = form.nombre_producto.data
         session['variable'] = True
@@ -2684,11 +2720,25 @@ class CompraView(ModelView):
         materia_prima = MateriaPrima.query.get(id_producto)
         prueba = request.cookies.get('pruebas')
         if prueba == 'true':
-            total_costo = round(form.precio_compra.data / form.cantidad.data, 2)
+            total_costo = form.precio_compra.data 
             materia_prima.costo = total_costo
             db.session.commit()
-        # Mensaje de confirmación
-        flash('Se ha registrado la compra y actualizado el inventario y el costo de materia prima', 'success')
+  
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     @expose('/new/', methods=('GET', 'POST'))
     def create_view(self):
