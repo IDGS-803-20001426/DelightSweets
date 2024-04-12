@@ -127,6 +127,44 @@
     </div>
   </div>
 
+  <!-- Modal -->
+  <div class="modal fade bd-example-modal-sm" id="stockBajoModal" tabindex="-1" role="dialog"
+    aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Galletas con stock bajo</h5>
+        </div>
+        <div class="modal-body" id="modal-body-stock-bajo">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+          <!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="galletasCaducadasModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Galletas caducadas</h5>
+        </div>
+        <div class="modal-body" id="modal-body-galletas-caducadas">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+          <button type="submit" form="form-galletas-caducadas" class="btn btn-primary">Enviar a mermas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
 
 
   <!-- TOP NAVBAR -->
@@ -191,7 +229,7 @@
 
         <!-- Opciones side-bar -->
         <ul class="sidebar-menu">
-          <li class="header">MAIN NAVIGATION</li>
+          <li class="header">NAVEGACIÓN</li>
           {% block main_menu %}
           {{ layout.menu() }}
           {% endblock %}
@@ -250,11 +288,11 @@
 
   {% block tail_js %}
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
-        if (ventasRecolectaLink) {
-            ventasRecolectaLink.style.display = 'none';
-        }
+    document.addEventListener('DOMContentLoaded', function () {
+      var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
+      if (ventasRecolectaLink) {
+        ventasRecolectaLink.style.display = 'none';
+      }
     });
   </script>
   <!-- jQuery 2.2.3 -->
@@ -403,6 +441,188 @@
       $("#cantidadModal").modal("show");
     }
 
+    $("#btnStockBajo").click(function () {
+      fetch('/consultarStockBajo', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error('Error en la solicitud');
+          }
+        })
+        .then(data => {
+          let gall = '<table class="table table-striped">' +
+            '<thead>' +
+            '  <tr>' +
+            '    <th scope="col">Nombre</th>' +
+            '    <th scope="col">Cantidad</th>' +
+            '  </tr>' +
+            '</thead>' +
+            '<tbody>';
+          data.forEach(function (galleta) {
+            gall += '<tr>' +
+              '<td>' + galleta.nombre + '</td>' +
+              '<td>' + galleta.cantidad + ' pz</td>' +
+              '</tr>';
+          });
+
+          gall += '</tbody>' +
+            '</table>';
+          $("#modal-body-stock-bajo").html(gall);
+
+          $("#stockBajoModal").modal("show");
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+    });
+
+    $("#btnGalletasCaducadas").click(function () {
+
+
+      fetch('/consultarGalletasCaducadas', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error('Error en la solicitud');
+          }
+        })
+        .then(data => {
+          let gall =
+            '<form id="form-galletas-caducadas"><input type="hidden" name="csrf_token_form" value="{{ csrf_token() }}"><table class="table table-striped">' +
+            '<thead>' +
+            '  <tr>' +
+            '    <th scope="col"></th>' +
+            '    <th scope="col">Nombre</th>' +
+            '    <th scope="col">Fecha producción</th>' +
+            '    <th scope="col">Cantidad</th>' +
+            '  </tr>' +
+            '</thead>' +
+            '<tbody>';
+          data.forEach(function (galleta) {
+            gall += '<tr>' +
+              '<td>' +
+              '  <div class="form-check">' +
+              '    <input class="form-check-input" type="checkbox" name="id_inventario" value="' + galleta
+              .id_inventario_prod_terminado + '" id="flexCheckChecked">' +
+              ' </div>' +
+              '</td>' +
+              '<td>' + galleta.nombre + '</td>';
+
+            // Crear un objeto Date con la cadena de fecha
+            var fecha = new Date(galleta.fecha_produccion);
+            // Formatear la fecha en un formato más legible
+            var opcionesDeFormato = {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: 'numeric',
+              second: 'numeric',
+              timeZoneName: 'short'
+            };
+            var fechaLegible = fecha.toLocaleDateString('es-MX', opcionesDeFormato);
+
+            gall += '<td>' + fechaLegible + '</td>' +
+              '<td>' + galleta.cantidad + ' pz</td>' +
+              '</tr>';
+          });
+
+          gall += '</tbody>' +
+            '</table></form>';
+
+          $("#modal-body-galletas-caducadas").html(gall);
+
+          $("#galletasCaducadasModal").modal("show");
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+
+    });
+
+    $(document).on('submit', '#form-galletas-caducadas', function (event) {
+      event.preventDefault(); // Evitar el envío del formulario por defecto
+
+      let csrf_token = $("input[name=csrf_token_form]").val();
+
+      // Array para almacenar los valores de los checks marcados
+      let checksSeleccionados = [];
+
+      // Obtener todos los elementos de tipo checkbox dentro del formulario
+      $('#form-galletas-caducadas input[type="checkbox"]').each(function () {
+        // Verificar si el checkbox está marcado
+        if ($(this).is(':checked')) {
+          // Si está marcado, agregar su valor al array
+          checksSeleccionados.push($(this).val());
+        }
+      });
+
+      // Verificar si se han seleccionado elementos antes de enviar la petición
+    if (checksSeleccionados.length === 0) {
+        // Mostrar un mensaje de error
+        Swal.fire({
+            title: "Error!",
+            text: "Por favor, selecciona al menos un elemento antes de enviar el formulario.",
+            icon: "error"
+        });
+        return; // Detener la ejecución de la función
+    }
+
+      // Hacer una solicitud fetch a la ruta de Flask
+      fetch('/actualizar_estado', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          },
+          body: JSON.stringify({
+            checks: checksSeleccionados
+          })
+        })
+        .then(response => {
+          if (response.ok) {
+            // La solicitud se completó con éxito
+            // Realizar cualquier acción adicional necesaria
+            Swal.fire({
+              title: "Éxito!",
+              text: "El lote se registró como merma!",
+              icon: "success"
+            }).then((result) => {
+              // Recargar la página
+              window.location.reload();
+            });
+          } else {
+            Swal.fire({
+              title: "Error!",
+              text: "Ocurrió un error al realizar el movimiento!",
+              icon: "error"
+            });
+          }
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+    });
+
+
     // Función para enviar la cantidad al backend
     function guardarCantidad() {
       var datos = [];
@@ -426,52 +646,6 @@
 
       $('#cantidadModal').modal('hide');
     }
-
-    $(document).on('submit', '#miFormulario', function (event) {
-      event.preventDefault(); // Evitar el envío del formulario por defecto
-
-      let id_inventario = $("input[name=idInventario]").val();
-      let csrf_token = $("input[name=csrf_token]").val(); // Obtener el valor del token CSRF del formulario
-
-      // Hacer una solicitud fetch a la ruta de Flask
-      fetch('/ejecutar-consulta-adicional', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
-          },
-          body: JSON.stringify({
-            inventario_id: id_inventario
-          })
-        })
-        .then(response => {
-          console.log(response)
-          if (response.ok) {
-            // La solicitud se completó con éxito
-            // Realizar cualquier acción adicional necesaria
-            Swal.fire({
-                title: "Éxito!",
-                text: "El lote se registró como merma!",
-                icon: "success"
-            }).then((result) => {
-                // Recargar la página
-                window.location.reload();
-            });
-          } else {
-            // La solicitud falló
-            Swal.fire({
-              title: "Error!",
-              text: "Ocurrió un error al realizar el movimiento!",
-              icon: "error"
-            });
-          }
-        })
-        .catch(error => {
-          // Manejar errores de red u otros errores
-          console.error('Error de red:', error);
-        });
-    });
-
 
     $("#registrarMateria").click(function () {
       $("#error-cantidad").html("");

@@ -1320,44 +1320,107 @@ def ejecutar_consulta_adicional():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/consultarStockBajo')
+def consulta():
+    try:
+        query = db.session.query(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre,
+                func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
+            ) \
+            .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
+            .group_by(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre
+            ) \
+            .having(func.sum(InventarioProductoTerminado.cantidad) < 10)
+            
+        results = query.all()
+        formatted_results = [{'id_galleta': row.id_galleta, 'nombre': row.nombre, 'cantidad': row.cantidad} for row in results]
+        # Devolver los resultados formateados como JSON
+        return jsonify(formatted_results), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()  # Rollback any changes made before the exception occurred
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/consultarGalletasCaducadas')
+def consultaCaducadas():
+    try:
+        # Calcular la fecha dos semanas y un día atrás
+        fecha_dos_semanas_un_dia_atras = datetime.now() - timedelta(days=15)
+
+        # Realizar la consulta
+        resultados = db.session.query(
+                        InventarioProductoTerminado.id_inventario_prod_terminado,
+                        InventarioProductoTerminado.id_galleta,
+                        InventarioProductoTerminado.fecha_produccion,
+                        InventarioProductoTerminado.cantidad,
+                        Galleta.nombre
+                    )\
+                     .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta)\
+                     .filter(InventarioProductoTerminado.estatus == 1)\
+                     .filter(InventarioProductoTerminado.fecha_produccion <= fecha_dos_semanas_un_dia_atras)
+            
+        results = resultados.all()
+
+        print(results)
+
+        formatted_results = [{'id_inventario_prod_terminado': row.id_inventario_prod_terminado,'id_galleta': row.id_galleta, 'nombre': row.nombre, 'cantidad': row.cantidad, 'fecha_produccion': row.fecha_produccion} for row in results]
+        # Devolver los resultados formateados como JSON
+        return jsonify(formatted_results), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()  # Rollback any changes made before the exception occurred
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/actualizar_estado', methods=['POST'])
+def actualizar_estado():
+    data = request.get_json()  # Obtener los datos enviados desde el frontend
+    checks_seleccionados = data.get('checks')  # Obtener los valores de los checks seleccionados
+    
+    try:
+        db.session.query(InventarioProductoTerminado).filter(InventarioProductoTerminado.id_inventario_prod_terminado.in_(checks_seleccionados)).update({'estatus': 0}, synchronize_session=False)
+        
+        # Insertar registros en la tabla "merma_prod_terminado"
+        for id_inventario in checks_seleccionados:
+            # Obtener el registro de InventarioProductoTerminado
+            producto = db.session.query(InventarioProductoTerminado).filter_by(id_inventario_prod_terminado=id_inventario).first()
+            # Crear un nuevo registro de MermaProdTerminado
+            merma = MermaProdTerminado(
+                id_inventario_prod_terminado=id_inventario,
+                cantidad=producto.cantidad,
+                fecha=datetime.now(),
+                motivo='Caducidad'
+            )
+            db.session.add(merma)
+        
+        db.session.commit()
+        return jsonify({"mensaje": "Los registros fueron actualizados y la merma fue registrada correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 class InventarioProductoTerminadoView(ModelView): 
     create_template = 'admin/traducciones/create_general.html'
     list_template = 'admin/traducciones/list_general.html'
     edit_template = 'admin/traducciones/edit_general.html'      
     def _handle_view(self, name, **kwargs):
-        # Este método se ejecutará cada vez que un usuario acceda a esta vista
-        print("El usuario ha ingresado a la vista de InventarioProductoTerminado")
-        # Puedes agregar aquí cualquier otra acción que desees realizar, como ejecutar una consulta SQL
         query = db.session.query(
-                    InventarioProductoTerminado.id_galleta,
-                    Galleta.nombre,
-                    func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
-                ) \
-                .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
-                .filter(InventarioProductoTerminado.estatus == 1) \
-                .group_by(
-                    InventarioProductoTerminado.id_galleta,
-                    Galleta.nombre
-                )
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre,
+                func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
+            ) \
+            .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
+            .group_by(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre
+            ) \
+            .having(func.sum(InventarioProductoTerminado.cantidad) < 10)
         
         # Ejecutar la consulta y obtener los resultados
         results = query.all()
-        
-        mensaje = '¡Galletas con stock bajo! '
-        cont = 0
 
-        # Haz lo que necesites con los resultados
-        # Iterar sobre los resultados
-        for row in results:
-            # Verificar si el campo cantidad es menor a 10
-            if row.cantidad < 10:
-                # Mostrar un mensaje en la vista
-                mensaje += f"{row.nombre} - {row.cantidad}pz, "
-                cont = cont + 1
-        
-        if cont > 0:
-            mensaje += f". Le sugerimos realizar una solicitud de producción."
-            flash(mensaje, 'warning')
+        if len(results) > 0:
+            flash(Markup(f"¡Tienes galletas con stock bajo! <button id='btnStockBajo' class='btn btn-primary'>Ver galletas</button>"), 'warning')
 
         # Calcular la fecha dos semanas y un día atrás
         fecha_dos_semanas_un_dia_atras = datetime.now() - timedelta(days=15)
@@ -1367,14 +1430,9 @@ class InventarioProductoTerminadoView(ModelView):
                      .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta)\
                      .filter(InventarioProductoTerminado.estatus == 1)\
                      .filter(InventarioProductoTerminado.fecha_produccion <= fecha_dos_semanas_un_dia_atras).all()
-        
-        for r in resultados:
-            #flash(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}.", "warning")
-            # Generar una URL con los IDs de inventario como parámetros
-            url_ejecutar_consulta_adicional = url_for('ejecutar_consulta_adicional', ids_inventario=','.join(str(r.InventarioProductoTerminado.id_inventario_prod_terminado) for r in resultados))
 
-            token_csrf = generate_csrf()  # Generar el token CSRF
-            flash(Markup(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}. <form id='miFormulario'><input type='hidden' name='csrf_token' value='{token_csrf}'><input type='hidden' name='idInventario' value='{r.InventarioProductoTerminado.id_inventario_prod_terminado}'><button type='submit' class='btn btn-primary' id='registro_merma'>Mover lote a merma</button></form>"), 'error')
+        if len(resultados) > 0:
+            flash(Markup(f"¡Tienes galletas caducadas! <button id='btnGalletasCaducadas' class='btn btn-primary'>Ver galletas</button>"), "error")
 
     def _format_image(view, context, model, name):
         if model.imagen:
@@ -2849,8 +2907,8 @@ admin_blueprints = [
     SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus', name="Solicitud Producción"),
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
-    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
-    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"),
+    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value="fa-arrow-down", name="Merma Galletas"),
+    MermaProduccionView(MermaProduccion, db.session, menu_icon_type='fa', menu_icon_value="fa-thumbs-down", name="Merma Materias"),
     CompraView(Compra, db.session, menu_icon_type='fa', menu_icon_value='fa-shopping-cart', name="Compras")
 ]
 # Agrega tus blueprints a Flask-Admin
@@ -2965,7 +3023,7 @@ class ProduccionAdminView(BaseView):
         return self.render('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
 
 # Registrar la vista de Flask-Admin para tu blueprint produccion_bp
-admin.add_view(ProduccionAdminView(name='Produccion', endpoint='produccion_admin'))
+admin.add_view(ProduccionAdminView(name='Produccion', endpoint='produccion_admin', menu_icon_type="fa", menu_icon_value="fa-industry"))
 
 def actualizarInventario(db, id_receta):
     # Obtener las materias primas requeridas por la receta
@@ -3264,7 +3322,7 @@ class VenderView(BaseView):
 
         return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
         
-admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin'))
+admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin', menu_icon_type="fa", menu_icon_value="fa-dollar-sign"))
 # -------------- INSERTAR RETIRO --------------
 def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
     try:
