@@ -34,7 +34,7 @@ from helpers import prettify_name, get_mdict_item_or_list
 
 
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta   
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta , EquivalenciaMedida  
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -2625,12 +2625,14 @@ class CompraForm(FlaskForm):
     fecha_caducidad = DateField('Fecha de Caducidad', validators=[DataRequired()])
     nombre_proveedor = SelectField('Nombre del Proveedor', coerce=int, validators=[DataRequired()])
     costo_oculto = HiddenField('Costo Oculto')
+    tipo_medida = SelectField('Tipo de Medida', coerce=int, validators=[DataRequired()])
 
     def __init__(self, *args, **kwargs):
         super(CompraForm, self).__init__(*args, **kwargs)
         self.setup_choices()
         self.setup_default_values()
 
+    
     def setup_choices(self):
         # Consultar los nombres de productos disponibles en la base de datos
         productos = MateriaPrima.query.all()
@@ -2649,6 +2651,15 @@ class CompraForm(FlaskForm):
         opciones_proveedores.insert(0, (-1, 'Elige una opción'))
         # Establecer las opciones en el campo de selección de proveedores
         self.nombre_proveedor.choices = opciones_proveedores 
+
+          # Consultar los tipos de medida disponibles en la base de datos
+        tipos_medida = EquivalenciaMedida.query.all()
+        # Crear una lista de opciones para el campo de selección de tipos de medida
+        opciones_tipos_medida = [(tipo.id_equivalencia, tipo.unidad) for tipo in tipos_medida]
+        # Insertar una opción de "elige una opción" como el primer elemento
+        opciones_tipos_medida.insert(0, (-1, 'Elige una opción'))
+        # Establecer las opciones en el campo de selección de tipos de medida
+        self.tipo_medida.choices = opciones_tipos_medida
 
     def setup_default_values(self):
         # Establecer la fecha actual como valor predeterminado para la fecha de compra
@@ -2676,13 +2687,15 @@ class CompraForm(FlaskForm):
         if self.fecha_compra.data < datetime.today().date():
             self.fecha_compra.errors.append('La fecha de compra no puede ser anterior a la fecha actual.')
             return False
+    
+            
         
         return True
 
 # Define una clase ModelView personalizada para las compras
 class CompraView(ModelView):
     create_template = 'admin/traducciones/create_general.html'
-    list_template = 'admin/traducciones/list_general.html'
+    list_template = 'admin/traducciones/list_general.html'  
     edit_template = 'admin/traducciones/edit_general.html'
 
     form = CompraForm
@@ -2727,7 +2740,7 @@ class CompraView(ModelView):
       
 
 
-
+        
 
 
 
