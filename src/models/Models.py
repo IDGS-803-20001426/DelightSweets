@@ -95,6 +95,7 @@ class Galleta(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     porcentaje_ganancia = db.Column(db.Float, nullable=False)
     imagen = db.Column(db.Text)
+    gramaje = db.Column(db.Integer)
     inventarios = relationship('InventarioProductoTerminado', backref='galleta')
     recetas = relationship('Receta', backref='galleta')  # Elimina este backref
 
@@ -161,7 +162,7 @@ class InventarioProductoTerminado(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     estatus = db.Column(db.Integer, default=None)
 
-    galleta_relacionada = db.relationship('Galleta', backref=db.backref('inventarios_producto_terminado', lazy=True))
+    galleta_relacionada = db.relationship('Galleta', backref=db.backref('inventarios_producto_terminado', lazy='dynamic'))
     mermas = relationship("MermaProdTerminado", back_populates="inventario_prod_terminado")
 
     
