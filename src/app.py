@@ -39,7 +39,7 @@ from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
 from models.produccionDao import ProduccionDAO
-from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO,MateriaPrimaDAO
 from config import DevelopmentConfig
 
 # PDF
@@ -1061,8 +1061,12 @@ class SolicitudProduccionForm(FlaskForm):
             galleta = receta.galleta
             if galleta:
                 inventario = sum([inventario.cantidad for inventario in galleta.inventarios])
+                
                 if inventario >= 50:
                     flash('La galleta asociada a esta receta tiene más de 50 en inventario, por lo cual no es posible continuar con tu solicitud.', 'warning')
+                    return False
+                if not materiaPrimaSuficiente(db,id_receta):
+                    flash('No hay la cantidad necesaria de ingredientes para elaborar esta receta.', 'warning')
                     return False
         return True
 
@@ -1083,7 +1087,7 @@ class SolicitudProduccionView(ModelView):
     column_list = ('id_receta', 'fecha_solicitud', 'fecha_terminacion', 'estatus')
 
     def is_accessible(self):
-        permiso = 9
+        permiso = 8
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_form_prefill(self, form, id):
@@ -1249,6 +1253,9 @@ import locale
 locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
 class VentasView(BaseView):
+    def is_accessible(self):
+        permiso = 12
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     @expose('/')
     def index(self):
         # Consulta las ventas por día desde tu base de datos usando SQLAlchemy
@@ -1477,7 +1484,8 @@ class InventarioProductoTerminadoView(ModelView):
         )
 
     def is_accessible(self):
-        return current_user.is_authenticated
+        permiso = 9
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     # Desactivar operaciones de CRUD
     can_create = False
@@ -1635,7 +1643,7 @@ class GalletaView(ModelView):
     }
 
     def is_accessible(self):
-        permiso = 10
+        permiso = 13
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_model_change(self, form, model, is_created):
@@ -1860,9 +1868,11 @@ class RecetaView(ModelView):
 
     form = RecetaForm
     form_columns = ('btn_materia')
+
     def is_accessible(self):
         permiso = 6
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+    
     def render(self, template, **kwargs):
         rendered = super().render(template, **kwargs)
         return rendered.replace('<form ', '<form id="daniel"')
@@ -2181,6 +2191,10 @@ class MermaProdTerminadoView(ModelView):
         'galleta': lambda v, c, m, p: m.inventario_prod_terminado.galleta.nombre if m.inventario_prod_terminado else "Galleta Desconocida"
     }
 
+    def is_accessible(self):
+        permiso = 11
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+
     def _inv_galleta_ind(self, id_galleta_param):
         return (
                 InventarioProductoTerminado.query
@@ -2450,6 +2464,9 @@ class MermaProduccionView(ModelView):
         'id_materia': lambda v, c, m, p: m.materia_prima.nombre if m.materia_prima else "Galleta Desconocida"
     }
 
+    def is_accessible(self):
+        permiso = 11
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_model_change(self, form, model, is_created):
         if form.tipo_merma_materia.data == "1":
@@ -2709,6 +2726,10 @@ class CompraView(ModelView):
     column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
     create_template = 'admin/create.html'
  
+    def is_accessible(self):
+        permiso = 4
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+
 
     def on_model_change(self, form, model, is_created):
         
@@ -2964,19 +2985,25 @@ def produccion():
             return jsonify({'errors': mensajes_error})
 
         #Permite actualizar el estatus del registro
-        ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+        if estatus == 0 or estatus == 2:
+            ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+        
         #Obtener datos producción & receta-------------------------------------------------
         datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
         numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
         #Insertar inventario_producto_terminado
         ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
         if estatus == 1:
-            actualizarInventario(db, datosReceta.id_receta)
+            respuesta = actualizarInventario(db, datosReceta.id_receta)
+            if not respuesta:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,'Cancelada')
+                mensajes_error.append("No existe materia prima suficiente para procesar la solicitud, por lo cual fue cancelada.")
+                return jsonify({'errors': mensajes_error})
+            else:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
         
         return jsonify({'exito': 'ok'})
     return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
-
- 
 
 
 class ProduccionAdminView(BaseView):
@@ -3010,14 +3037,22 @@ class ProduccionAdminView(BaseView):
                 return jsonify({'errors': mensajes_error})
 
             #Permite actualizar el estatus del registro
-            ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+            if estatus == 0 or estatus == 2:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+            
             #Obtener datos producción & receta-------------------------------------------------
             datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
             numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
             #Insertar inventario_producto_terminado
             ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
             if estatus == 1:
-                actualizarInventario(db, datosReceta.id_receta)
+                respuesta = actualizarInventario(db, datosReceta.id_receta)
+                if not respuesta:
+                    ProduccionDAO.actualizarEstatusYFecha(db,idProd,'Cancelada')
+                    mensajes_error.append("No existe materia prima suficiente para procesar la solicitud, por lo cual fue cancelada.")
+                    return jsonify({'errors': mensajes_error})
+                else:
+                    ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
             
             return jsonify({'exito': 'ok'})
         return self.render('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
@@ -3041,7 +3076,7 @@ def actualizarInventario(db, id_receta):
         cantidad_disponible_total = sum(item.cantidad for item in inventario)
         if cantidad_disponible_total < cantidad_requerida:
             print(f"No hay suficiente cantidad disponible de la materia prima con ID {id_materia}.")
-            continue
+            return False
         
         # Consumir la cantidad necesaria de la materia prima
         cantidad_consumida = 0
@@ -3060,7 +3095,32 @@ def actualizarInventario(db, id_receta):
         
         # Guardar los cambios en la base de datos para esta materia prima
         db.session.commit()
+    return True
 
+def materiaPrimaSuficiente(db, id_receta):
+    # Obtener las materias primas requeridas por la receta
+    materias_primas_requeridas = ProduccionDAO.obtenerMateriasPrimasPorReceta(db, id_receta)
+    for materia_prima in materias_primas_requeridas:
+        id_materia = materia_prima.id_materia
+        cantidad_requerida = materia_prima.cantidad
+        
+        # Obtener el inventario de la materia prima ordenado por fecha de caducidad
+        inventario = ProduccionDAO.obtenerMateriasPrimasInventario(db, id_materia)
+        
+        # Verificar si hay suficiente cantidad disponible en el inventario
+        cantidad_disponible_total = sum(item.cantidad for item in inventario)
+        if cantidad_disponible_total < cantidad_requerida:
+            print(f"No hay suficiente cantidad disponible de la materia prima con ID {id_materia}.")
+            return False
+    return True
+
+@app.route('/obtenerUnidadMedidaMateriaPrima', methods=['GET', 'POST'])
+def obtenerUnidadMedidaMateriaPrima():
+    materia_id = request.args.get('materia_id')  # Recibe el parámetro de ID de materia
+    print("--------------------------------------------{}".format(materia_id))
+    # Realiza la consulta y el join
+    unidad = MateriaPrimaDAO.obtener_unidad_medida(materia_id)
+    return jsonify({'unidad': unidad})
 
 
 
@@ -3284,6 +3344,9 @@ def ventasCorte():
 
 
 class VenderView(BaseView):
+    def is_accessible(self):
+        permiso = 10
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     @expose('/', methods=['GET', 'POST'])
     def index(self):
         galletas = GalletaDAO.get_costo_galletas()

@@ -80,29 +80,43 @@
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="cantidadModalLabel">Ingrese la cantidad</h5>
           <button type="button" class="close" data-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
           </button>
+          <h5 class="modal-title" id="cantidadModalLabel">Ingrese la cantidad</h5>
         </div>
         <div class="modal-body">
-          <label for="selectMateriasPrimas">Materias primas</label>
-          <select class="form-control" aria-label="Default select example" id="selectMateriasPrimas"></select>
-          <label for="cantidadMateriasPrimas">Cantidad</label>
-          <div>
-            <input type="number" class="form-control" name="" id="cantidadMateriasPrimas">
-            <small class="text-danger" id="error-cantidad"></small>
-          </div>
-          <button type="button" class="btn btn-primary" style="margin: 5px 0;" id="registrarMateria">Guardar</button>
 
-          <table id="tableMaterias" border="1" width="100%">
+          <div class="form-row">
+            <div class="col-md-6">
+              <label for="selec6MateriasPrimas">Materias primas</label>
+              <select class="form-control" aria-label="Default select example" id="selectMateriasPrimas"></select>
+            </div>
+            <div class="col-md-6">
+              <label for="unidadMedida">Unidad de medida</label>
+              <input type="text" class="form-control" id="unidadMedida" readonly>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="col-md-6">
+              <label for="cantidadMateriasPrimas">Cantidad</label>
+              <input type="number" class="form-control" name="" id="cantidadMateriasPrimas" min="1">
+              <small class="text-danger" id="error-cantidad" style="font-size:15px;"></small>
+            </div>
+            <div class="col-md-6">
+              <button type="button" class="btn btn-primary" style="margin: 25px 0;width: 100%;" id="registrarMateria">Agregar</button>
+            </div>
+          </div>
+          
+
+          <table class="table-dark" id="tableMaterias" border="1" width="95%" style="margin-left: 3%;">
             <thead>
               <th width="25%" style="padding: 5px; display: none; text-align: center;">id_materia</th>
-              <th width="25%" style="padding: 5px; text-align: center;">materia</th>
-              <th width="25%" style="padding: 5px; text-align: center;">cantidad</th>
+              <th width="25%" style="padding: 5px; text-align: center;">Materia</th>
+              <th width="25%" style="padding: 5px; text-align: center;">Cantidad</th>
               <th width="25%" style="padding: 5px; text-align: center;">Acciones</th>
             </thead>
-            <tbody id="materiasPrimasSeleccionadas">
+            <tbody id="materiasPrimasSeleccionadas" style="text-align: center;">
 
             </tbody>
           </table>
@@ -120,7 +134,6 @@
         {% endif %}
         {% endif %}
         <div class="modal-footer">
-          <!-- <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button> -->
           <button type="button" class="btn btn-primary" onclick="guardarCantidad()">Guardar</button>
         </div>
       </div>
@@ -440,6 +453,27 @@
     function abrirModal() {
       $("#cantidadModal").modal("show");
     }
+
+    document.getElementById('selectMateriasPrimas').addEventListener('change', function() {
+        var idMateria = this.options[this.selectedIndex].value;
+        var unidadMedidaInput = document.getElementById('unidadMedida');
+        console.log("unidad: "+ idMateria)
+        $.ajax({
+          type: 'GET',
+          url: '/obtenerUnidadMedidaMateriaPrima',
+          data: {
+              'materia_id': idMateria
+          },
+          success: function(response) {
+              console.log('Unidad de medida:', response.unidad);
+              unidadMedidaInput.value = response.unidad;
+          },
+          error: function(error) {
+              console.error('Error al obtener la unidad de medida:', error);
+          }
+        });
+        
+    });
 
     $("#btnStockBajo").click(function () {
       fetch('/consultarStockBajo', {

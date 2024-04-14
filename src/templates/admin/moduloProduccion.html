@@ -85,29 +85,34 @@
 </script>
 {% from "_macros.html" import render_field%}
  <!-- MODAL PARA CAMBIAR ESTATUS PRODUCCIÓN -->
-<div class="modal fade" id="modalCambiarEstatusProd" tabindex="-1" aria-labelledby="modalCambiarEstatusProd" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-            <h5 class="modal-title" id="titulo-modal">Modificar Estatus</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="formCambiarEstatus" method="post" action="">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3" style="display: none;">
-                        {{ render_field(form.id, class="form-control") }}                        
-                    </div>
-                    <div class="mb-3">
-                        {{render_field(form.estatusProduccion,class="form-control")}}
-                        <div id="error-messages" class="text-danger"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </form>
-            </div>
+ <div class="modal fade bd-example-modal-sm" tabindex="-1" role="dialog" id="modalCambiarEstatusProd" aria-labelledby="modalCambiarEstatusProd" aria-hidden="true" >
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h4 class="modal-title" id="modalCambiarEstatusProd">Modificar Estatus</h4>
         </div>
+        <div class="modal-body">
+            <form id="formCambiarEstatus" method="post" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="mb-3" style="display: none;">
+                    {{ render_field(form.id, class="form-control") }}                        
+                </div>
+                <div class="mb-3">
+                    {{render_field(form.estatusProduccion,class="form-control")}}
+                    <div id="error-messages" class="text-danger"></div>
+                </div>
+                <div class="mb-3">
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Guardar</button>
+                </div>
+            </form>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
 
 {% endblock body%}
