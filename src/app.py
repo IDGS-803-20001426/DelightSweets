@@ -35,11 +35,7 @@ from sqlalchemy import update,case,text
 
 
 # Models:
-<<<<<<< HEAD
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta , EquivalenciaMedida  
-=======
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta,DetalleVenta   
->>>>>>> 36b344f2aed33191a17fff6a796498803a9ff134
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta , EquivalenciaMedida , DetalleVenta 
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -1423,16 +1419,56 @@ class VentasView(BaseView):
         for venta in resultado:
             labels_galletaUtilidad.append(venta.Nombre_Galleta)
             data_galletaUtilidad.append(str(venta.Utilidad_Generada))
+            
+                    
+            # Empleado encargado de generar las galletas -----------------------------------------------------------------------
+            consulta_sql_empleado_galleta = text("""
+                SELECT 
+                    sp.id_solicitud AS Solicitud, 
+                    u.nombre_completo AS Empleado_Reponsable, 
+                    r.nombre_receta AS Receta, 
+                    g.nombre AS Galleta
+                FROM 
+                    solicitud_prooduccion AS sp
+                INNER JOIN 
+                    usuario AS u ON sp.id_usuario = u.id_usuario
+                INNER JOIN 
+                    receta AS r ON sp.id_receta = r.id_receta
+                INNER JOIN 
+                    galleta AS g ON g.id_galleta = r.id_galleta
+                WHERE 
+                    sp.estatus = 'Terminada';
+            """)
+
+        
+            resultado_empleado_galleta = db.session.execute(consulta_sql_empleado_galleta)
+
+            
+            datos_solicitudes = []
+
+          
+            for solicitud in resultado_empleado_galleta:
+                datos_solicitud = {
+                    'Solicitud': solicitud.Solicitud,
+                    'Empleado_Resposable': solicitud.Empleado_Reponsable, 
+                    'Receta': solicitud.Receta,
+                    'Galleta': solicitud.Galleta
+                }
+                datos_solicitudes.append(datos_solicitud)
+
+            # Renderizar el template con los datos
+            return self.render('ventas.html', 
+                            labels_diarias=labels_diarias, data_diarias=data_diarias,
+                            labels_semanales=labels_semanales, data_semanales=data_semanales,
+                            labels_galletaCostoProduccion=labels_galletaCostoProduccion, data_galletaCostoProduccion=data_galletaCostoProduccion,
+                            labels_galletaMasVendida=labels_galletaMasVendida, data_galletaMasVendida=data_galletaMasVendida,
+                            labels_galletaUtilidad=labels_galletaUtilidad, data_galletaUtilidad=data_galletaUtilidad,
+                            solicitudes=datos_solicitudes)
 
 
 
-        # Renderizar el template con los datos
-        return self.render('ventas.html', 
-                           labels_diarias=labels_diarias, data_diarias=data_diarias,
-                           labels_semanales=labels_semanales, data_semanales=data_semanales,
-                           labels_galletaCostoProduccion=labels_galletaCostoProduccion,data_galletaCostoProduccion=data_galletaCostoProduccion,
-                           labels_galletaMasVendida=labels_galletaMasVendida,data_galletaMasVendida=data_galletaMasVendida,
-                           labels_galletaUtilidad=labels_galletaUtilidad,data_galletaUtilidad=data_galletaUtilidad)
+
+
         
 admin.add_view(VentasView(name='Análisis de Ventas', menu_icon_type='fa', menu_icon_value='fa-bar-chart', endpoint='ventas'))
 

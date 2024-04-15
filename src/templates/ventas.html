@@ -23,6 +23,21 @@
             color: white; /* Color del texto */
             text-align: center; /* Centra el título */
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
 
@@ -50,6 +65,32 @@
     <h2>Utilidad Galleta</h2>
     <canvas id="galletaUtilidadChart"></canvas>
 </div>
+<div class="chart-container">
+    <h2>Empleado Responsable de Hornear las Galletas</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th >Solicitud</th>
+                <th >Empleado Responsable</th>
+                <th >Receta</th>
+                <th >Galleta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for solicitud in solicitudes %}
+            <tr>
+                <td style="color: white;">{{ solicitud['Solicitud'] }}</td>
+                <td style="color: white;">{{ solicitud['Empleado_Resposable'] }}</td>
+                <td style="color: white;">{{ solicitud['Receta'] }}</td>
+                <td style="color: white;">{{ solicitud['Galleta'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
   
 <script>
     // Gráfico de Ventas Diarias
@@ -97,6 +138,7 @@
             }
         }
     });
+
     // Gráfico de Galleta más vendida
     const ctxGalletaMasVendida = document.getElementById('galletaMasVendidaChart');
     new Chart(ctxGalletaMasVendida, {
@@ -105,7 +147,6 @@
             labels: {{ labels_galletaMasVendida | tojson }},
             datasets: [{
                 label: '# de Cantidad Vendidas',
-                
                 data: {{ data_galletaMasVendida | tojson }},
                 backgroundColor: 'rgb(255, 99, 132)',
                 borderColor: 'rgba(245, 211, 23, 1)',
@@ -126,9 +167,9 @@
                     }
                 }
             }
-
         }
     });
+
     // Gráfico de Costo Produccion por Galleta
     const ctxGalletaProdCosto = document.getElementById('costoProdGalletaChart');
     new Chart(ctxGalletaProdCosto, {
@@ -159,14 +200,15 @@
             }
         }
     });
-    // Gráfico de Galleta con más utilidad
+
+    // Gráfico de Utilidad Galleta
     const ctxGalletaUtilidad = document.getElementById('galletaUtilidadChart');
     new Chart(ctxGalletaUtilidad, {
         type: 'bar',
         data: {
             labels: {{ labels_galletaUtilidad | tojson }},
             datasets: [{
-                label: '# de Costo Produccion',
+                label: '# de Utilidad Galleta',
                 data: {{ data_galletaUtilidad | tojson }},
                 backgroundColor: 'rgb(75, 192, 192)',
                 borderColor: 'rgba(38, 0, 255, 1)',
@@ -189,7 +231,8 @@
             }
         }
     });
+
+  
 </script>
 
 {% endblock body%}
-s
