@@ -1,4 +1,4 @@
-from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado, CorteCaja, CorteCajaVenta, Retiro
+from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado, CorteCaja, CorteCajaVenta, Retiro, Proveedor
 from sqlalchemy import func
 
 class GalletaDAO:
@@ -266,10 +266,9 @@ class RetiroDAO:
             raise Exception(ex)
 
     @classmethod
-    def consultar_por_id_corte_caja(cls, id_corte_caja):
+    def consultar_retiros_recolecta_por_id_corte_caja(cls, id_corte_caja):
         try:
-            # print(id_corte_caja)
-            retiros = Retiro.query.filter_by(id_corte_caja=id_corte_caja).all()
+            retiros = Retiro.query.filter_by(id_corte_caja=id_corte_caja, motivo='recolecta').all()
             resultados = []
             for retiro in retiros:
                 resultado = {
@@ -285,3 +284,39 @@ class RetiroDAO:
         except Exception as ex:
             raise Exception(ex)
 
+    @classmethod
+    def consultar_retiros_no_recolecta_por_id_corte_caja(cls, id_corte_caja):
+        try:
+            retiros = Retiro.query.filter(Retiro.id_corte_caja == id_corte_caja, Retiro.motivo != 'recolecta').all()
+            resultados = []
+            for retiro in retiros:
+                resultado = {
+                    'id_retiro': retiro.id_retiro,
+                    'fecha_hora': retiro.fecha_hora.strftime("%Y-%m-%d %H:%M:%S"),
+                    'monto': retiro.monto,
+                    'motivo': retiro.motivo,
+                    'id_corte_caja': retiro.id_corte_caja,
+                    'id_usuario': retiro.id_usuario
+                }
+                resultados.append(resultado)
+            return resultados
+        except Exception as ex:
+            raise Exception(ex)
+
+
+class ProveedorDAO:
+
+    @classmethod
+    def consultar_id_nombre_proveedores(cls):
+        try:
+            proveedores = Proveedor.query.all()
+            resultados = []
+            for proveedor in proveedores:
+                resultado = {
+                    'id_proveedor': proveedor.id_proveedor,
+                    'nombre': proveedor.nombre
+                }
+                resultados.append(resultado)
+            return resultados
+        except Exception as ex:
+            raise Exception(ex)

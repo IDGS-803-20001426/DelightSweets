@@ -34,7 +34,7 @@
                 </tbody>
             </table>
         </div>
-
+        {% if monto_retiro_total %}
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead class="thead-dark">
@@ -68,9 +68,47 @@
                 </tfoot>
             </table>
         </div>
+        {% endif %}
+
+        {% if monto_retiro_total_pago %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>ID Retiro</th>
+                        <th>Fecha y Hora</th>
+                        <th>Monto</th>
+                        <th>Motivo</th>
+                        <th>ID Corte Caja</th>
+                        <th>ID Usuario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for retiro in retiros_pago %}
+                    <tr>
+                        <td>{{ retiro.id_retiro }}</td>
+                        <td>{{ retiro.fecha_hora }}</td>
+                        <td>{{ retiro.monto }}</td>
+                        <td>{{ retiro.motivo }}</td>
+                        <td>{{ retiro.id_corte_caja }}</td>
+                        <td>{{ retiro.id_usuario }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2">Monto Total de Retiros por Pago:</td>
+                        <td>{{ monto_retiro_total_pago }}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% endif %}
+
 
         <div class="text-center mt-3">
-            <form action="/ventas" method="get">
+            <form action="/admin/ventas_admin" method="get">
                 <button type="submit" class="btn btn-primary">Regresar</button>
             </form>
             {% if pdf_base64 %}
@@ -87,7 +125,7 @@
             <p>No es posible visualizar el corte del día.</p>
         </div>
         <div class="text-center mt-3">
-            <form action="/ventas" method="get">
+            <form action="/admin/ventas_admin" method="get">
                 <button type="submit" class="btn btn-primary">Regresar</button>
             </form>
         </div>
