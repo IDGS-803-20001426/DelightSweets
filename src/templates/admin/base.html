@@ -21,9 +21,11 @@
   </link>
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <!-- <link rel="stylesheet" href="{{url_for('static',filename='plugins/fontawesome/5.15.4/all.min.css')}}"> -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
   <!-- Ionicons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
+  <!-- <link rel="stylesheet" href="{{url_for('static',filename='plugins/ionicons/2.0.1/ionicons.min.css')}}"> -->
   <!-- Theme style -->
   <link href="{{url_for('static',filename='css/AdminLTE.min.css')}}" rel="stylesheet">
   </link>
@@ -80,29 +82,43 @@
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="cantidadModalLabel">Ingrese la cantidad</h5>
           <button type="button" class="close" data-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
           </button>
+          <h5 class="modal-title" id="cantidadModalLabel">Ingrese la cantidad</h5>
         </div>
         <div class="modal-body">
-          <label for="selectMateriasPrimas">Materias primas</label>
-          <select class="form-control" aria-label="Default select example" id="selectMateriasPrimas"></select>
-          <label for="cantidadMateriasPrimas">Cantidad</label>
-          <div>
-            <input type="number" class="form-control" name="" id="cantidadMateriasPrimas">
-            <small class="text-danger" id="error-cantidad"></small>
-          </div>
-          <button type="button" class="btn btn-primary" style="margin: 5px 0;" id="registrarMateria">Guardar</button>
 
-          <table id="tableMaterias" border="1" width="100%">
+          <div class="form-row">
+            <div class="col-md-6">
+              <label for="selec6MateriasPrimas">Materias primas</label>
+              <select class="form-control" aria-label="Default select example" id="selectMateriasPrimas"></select>
+            </div>
+            <div class="col-md-6">
+              <label for="unidadMedida">Unidad de medida</label>
+              <input type="text" class="form-control" id="unidadMedida" readonly>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="col-md-6">
+              <label for="cantidadMateriasPrimas">Cantidad</label>
+              <input type="number" class="form-control" name="" id="cantidadMateriasPrimas" min="1">
+              <small class="text-danger" id="error-cantidad" style="font-size:15px;"></small>
+            </div>
+            <div class="col-md-6">
+              <button type="button" class="btn btn-primary" style="margin: 25px 0;width: 100%;" id="registrarMateria">Agregar</button>
+            </div>
+          </div>
+          
+
+          <table class="table-dark" id="tableMaterias" border="1" width="95%" style="margin-left: 3%;">
             <thead>
               <th width="25%" style="padding: 5px; display: none; text-align: center;">id_materia</th>
-              <th width="25%" style="padding: 5px; text-align: center;">materia</th>
-              <th width="25%" style="padding: 5px; text-align: center;">cantidad</th>
+              <th width="25%" style="padding: 5px; text-align: center;">Materia</th>
+              <th width="25%" style="padding: 5px; text-align: center;">Cantidad</th>
               <th width="25%" style="padding: 5px; text-align: center;">Acciones</th>
             </thead>
-            <tbody id="materiasPrimasSeleccionadas">
+            <tbody id="materiasPrimasSeleccionadas" style="text-align: center;">
 
             </tbody>
           </table>
@@ -120,12 +136,49 @@
         {% endif %}
         {% endif %}
         <div class="modal-footer">
-          <!-- <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button> -->
           <button type="button" class="btn btn-primary" onclick="guardarCantidad()">Guardar</button>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Modal -->
+  <div class="modal fade bd-example-modal-sm" id="stockBajoModal" tabindex="-1" role="dialog"
+    aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Galletas con stock bajo</h5>
+        </div>
+        <div class="modal-body" id="modal-body-stock-bajo">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+          <!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="galletasCaducadasModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Galletas caducadas</h5>
+        </div>
+        <div class="modal-body" id="modal-body-galletas-caducadas">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+          <button type="submit" form="form-galletas-caducadas" class="btn btn-primary">Enviar a mermas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
 
 
@@ -191,7 +244,7 @@
 
         <!-- Opciones side-bar -->
         <ul class="sidebar-menu">
-          <li class="header">MAIN NAVIGATION</li>
+          <li class="header">NAVEGACIÓN</li>
           {% block main_menu %}
           {{ layout.menu() }}
           {% endblock %}
@@ -250,17 +303,17 @@
 
   {% block tail_js %}
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
-        if (ventasRecolectaLink) {
-            ventasRecolectaLink.style.display = 'none';
-        }
+    document.addEventListener('DOMContentLoaded', function () {
+      var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
+      if (ventasRecolectaLink) {
+        ventasRecolectaLink.style.display = 'none';
+      }
     });
   </script>
   <!-- jQuery 2.2.3 -->
   <script src="{{url_for('static',filename='plugins/jQuery/jquery-2.2.3.min.js')}}"></script>
   <!-- jQuery UI 1.11.4 -->
-  <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+  <script src="{{url_for('static',filename='plugins/jQueryUI/jquery-ui.min.js')}}"></script>
   <!-- Resolve conflict in jQuery UI tooltip with Bootstrap tooltip -->
   <script>
     $.widget.bridge('uibutton', $.ui.button);
@@ -277,7 +330,7 @@
   {% endif %}
 
   <!-- Morris.js charts -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.0/raphael-min.js"></script>
+  <script src="{{url_for('static',filename='plugins/raphael/2.1.0/raphael.min.js')}}"></script>
   <script src="{{url_for('static',filename='plugins/morris/morris.min.js')}}"></script>
   <!-- Sparkline -->
   <script src="{{url_for('static',filename='plugins/sparkline/jquery.sparkline.min.js')}}"></script>
@@ -287,7 +340,7 @@
   <!-- jQuery Knob Chart -->
   <script src="{{url_for('static',filename='plugins/knob/jquery.knob.js')}}"></script>
   <!-- daterangepicker -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.11.2/moment.min.js"></script>
+  <script src="{{url_for('static',filename='plugins/moment/2.11.2/moment.min.js')}}"></script>
   <script src="{{url_for('static',filename='plugins/daterangepicker/daterangepicker.js')}}"></script>
   <!-- datepicker -->
   <script src="{{url_for('static',filename='plugins/datepicker/bootstrap-datepicker.js')}}"></script>
@@ -403,6 +456,209 @@
       $("#cantidadModal").modal("show");
     }
 
+    document.getElementById('selectMateriasPrimas').addEventListener('change', function() {
+        var idMateria = this.options[this.selectedIndex].value;
+        var unidadMedidaInput = document.getElementById('unidadMedida');
+        console.log("unidad: "+ idMateria)
+        $.ajax({
+          type: 'GET',
+          url: '/obtenerUnidadMedidaMateriaPrima',
+          data: {
+              'materia_id': idMateria
+          },
+          success: function(response) {
+              console.log('Unidad de medida:', response.unidad);
+              unidadMedidaInput.value = response.unidad;
+          },
+          error: function(error) {
+              console.error('Error al obtener la unidad de medida:', error);
+          }
+        });
+        
+    });
+
+    $("#btnStockBajo").click(function () {
+      fetch('/consultarStockBajo', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error('Error en la solicitud');
+          }
+        })
+        .then(data => {
+          let gall = '<table class="table table-striped">' +
+            '<thead>' +
+            '  <tr>' +
+            '    <th scope="col">Nombre</th>' +
+            '    <th scope="col">Cantidad</th>' +
+            '  </tr>' +
+            '</thead>' +
+            '<tbody>';
+          data.forEach(function (galleta) {
+            gall += '<tr>' +
+              '<td>' + galleta.nombre + '</td>' +
+              '<td>' + galleta.cantidad + ' pz</td>' +
+              '</tr>';
+          });
+
+          gall += '</tbody>' +
+            '</table>';
+          $("#modal-body-stock-bajo").html(gall);
+
+          $("#stockBajoModal").modal("show");
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+    });
+
+    $("#btnGalletasCaducadas").click(function () {
+
+
+      fetch('/consultarGalletasCaducadas', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error('Error en la solicitud');
+          }
+        })
+        .then(data => {
+          let gall =
+            '<form id="form-galletas-caducadas"><input type="hidden" name="csrf_token_form" value="{{ csrf_token() }}"><table class="table table-striped">' +
+            '<thead>' +
+            '  <tr>' +
+            '    <th scope="col"></th>' +
+            '    <th scope="col">Nombre</th>' +
+            '    <th scope="col">Fecha producción</th>' +
+            '    <th scope="col">Cantidad</th>' +
+            '  </tr>' +
+            '</thead>' +
+            '<tbody>';
+          data.forEach(function (galleta) {
+            gall += '<tr>' +
+              '<td>' +
+              '  <div class="form-check">' +
+              '    <input class="form-check-input" type="checkbox" name="id_inventario" value="' + galleta
+              .id_inventario_prod_terminado + '" id="flexCheckChecked">' +
+              ' </div>' +
+              '</td>' +
+              '<td>' + galleta.nombre + '</td>';
+
+            // Crear un objeto Date con la cadena de fecha
+            var fecha = new Date(galleta.fecha_produccion);
+            // Formatear la fecha en un formato más legible
+            var opcionesDeFormato = {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: 'numeric',
+              second: 'numeric',
+              timeZoneName: 'short'
+            };
+            var fechaLegible = fecha.toLocaleDateString('es-MX', opcionesDeFormato);
+
+            gall += '<td>' + fechaLegible + '</td>' +
+              '<td>' + galleta.cantidad + ' pz</td>' +
+              '</tr>';
+          });
+
+          gall += '</tbody>' +
+            '</table></form>';
+
+          $("#modal-body-galletas-caducadas").html(gall);
+
+          $("#galletasCaducadasModal").modal("show");
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+
+    });
+
+    $(document).on('submit', '#form-galletas-caducadas', function (event) {
+      event.preventDefault(); // Evitar el envío del formulario por defecto
+
+      let csrf_token = $("input[name=csrf_token_form]").val();
+
+      // Array para almacenar los valores de los checks marcados
+      let checksSeleccionados = [];
+
+      // Obtener todos los elementos de tipo checkbox dentro del formulario
+      $('#form-galletas-caducadas input[type="checkbox"]').each(function () {
+        // Verificar si el checkbox está marcado
+        if ($(this).is(':checked')) {
+          // Si está marcado, agregar su valor al array
+          checksSeleccionados.push($(this).val());
+        }
+      });
+
+      // Verificar si se han seleccionado elementos antes de enviar la petición
+    if (checksSeleccionados.length === 0) {
+        // Mostrar un mensaje de error
+        Swal.fire({
+            title: "Error!",
+            text: "Por favor, selecciona al menos un elemento antes de enviar el formulario.",
+            icon: "error"
+        });
+        return; // Detener la ejecución de la función
+    }
+
+      // Hacer una solicitud fetch a la ruta de Flask
+      fetch('/actualizar_estado', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
+          },
+          body: JSON.stringify({
+            checks: checksSeleccionados
+          })
+        })
+        .then(response => {
+          if (response.ok) {
+            // La solicitud se completó con éxito
+            // Realizar cualquier acción adicional necesaria
+            Swal.fire({
+              title: "Éxito!",
+              text: "El lote se registró como merma!",
+              icon: "success"
+            }).then((result) => {
+              // Recargar la página
+              window.location.reload();
+            });
+          } else {
+            Swal.fire({
+              title: "Error!",
+              text: "Ocurrió un error al realizar el movimiento!",
+              icon: "error"
+            });
+          }
+        })
+        .catch(error => {
+          // Manejar errores de red u otros errores
+          console.error('Error de red:', error);
+        });
+    });
+
+
     // Función para enviar la cantidad al backend
     function guardarCantidad() {
       var datos = [];
@@ -427,52 +683,6 @@
       $('#cantidadModal').modal('hide');
     }
 
-    $(document).on('submit', '#miFormulario', function (event) {
-      event.preventDefault(); // Evitar el envío del formulario por defecto
-
-      let id_inventario = $("input[name=idInventario]").val();
-      let csrf_token = $("input[name=csrf_token]").val(); // Obtener el valor del token CSRF del formulario
-
-      // Hacer una solicitud fetch a la ruta de Flask
-      fetch('/ejecutar-consulta-adicional', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrf_token // Agregar el token CSRF como encabezado
-          },
-          body: JSON.stringify({
-            inventario_id: id_inventario
-          })
-        })
-        .then(response => {
-          console.log(response)
-          if (response.ok) {
-            // La solicitud se completó con éxito
-            // Realizar cualquier acción adicional necesaria
-            Swal.fire({
-                title: "Éxito!",
-                text: "El lote se registró como merma!",
-                icon: "success"
-            }).then((result) => {
-                // Recargar la página
-                window.location.reload();
-            });
-          } else {
-            // La solicitud falló
-            Swal.fire({
-              title: "Error!",
-              text: "Ocurrió un error al realizar el movimiento!",
-              icon: "error"
-            });
-          }
-        })
-        .catch(error => {
-          // Manejar errores de red u otros errores
-          console.error('Error de red:', error);
-        });
-    });
-
-
     $("#registrarMateria").click(function () {
       $("#error-cantidad").html("");
       const idMateria = $("#selectMateriasPrimas").val();
@@ -481,6 +691,10 @@
 
       if (cantidad <= 0 || cantidad == "") {
         $("#error-cantidad").append("Se necesita una cantidad");
+        return;
+      }
+      if (nombre == "Selecciona una materia") {
+        $("#error-cantidad").html("Por favor, selecciona una materia.");
         return;
       }
 
@@ -498,38 +712,53 @@
     });
 
     $("#btn_modal").click(function () {
-      $("#materiasPrimasSeleccionadas").html("");
+        $("#materiasPrimasSeleccionadas").html("");
 
-      var datos = $("#datos_materias_primas").val();
-      var datos_json = JSON.parse(datos);
-
-      var fechaActual = new Date();
-      var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
-      datos_json.forEach(function (materias) {
-        $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + materias['id_materia'] +
-          "</td><td style='padding: 2px;'>" + materias['materia'] + "</td><td style='padding: 2px;'>" +
-          materias['cantidad'] +
-          "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual
-          .getTime() + numeroAleatorio + "'>Eliminar</button></td></tr>")
-      });
-
+        var datos = $("#datos_materias_primas").val();
+        if (datos.trim() !== "") {
+            var datos_json = JSON.parse(datos);
+            console.log(datos_json);
+            var fechaActual = new Date();
+            var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
+            datos_json.forEach(function (materias) {
+                $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + materias['id_materia'] +
+                    "</td><td style='padding: 2px;'>" + materias['Materia'] + "</td><td style='padding: 2px;'>" +
+                    materias['Cantidad'] +
+                    "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual
+                    .getTime() + numeroAleatorio + "'>Eliminar</button></td></tr>")
+            });
+        } else {
+            console.error("Los datos de materias primas están vacíos.");
+        }
     });
 
+
     fetch('/materias_primas')
-      .then(response => response.json())
-      .then(data => {
-        // Llenar el campo de selección con las opciones recibidas
-        const select = document.getElementById('selectMateriasPrimas');
-        data.forEach(opcion => {
-          const option = document.createElement('option');
-          option.value = opcion.id;
-          option.text = opcion.nombre;
-          select.appendChild(option);
-        });
-      })
-      .catch(error => {
-        console.error('Error al obtener las opciones de materias primas:', error);
-      });
+  .then(response => response.json())
+  .then(data => {
+    // Llenar el campo de selección con las opciones recibidas
+    const select = document.getElementById('selectMateriasPrimas');
+
+    // Agregar la opción por defecto
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.text = 'Selecciona una materia';
+    defaultOption.selected = true; // Para que aparezca seleccionada por defecto
+    defaultOption.disabled = true; // Para que no sea seleccionable
+    select.appendChild(defaultOption);
+
+    // Llenar el campo de selección con las opciones recibidas
+    data.forEach(opcion => {
+      const option = document.createElement('option');
+      option.value = opcion.id;
+      option.text = opcion.nombre;
+      select.appendChild(option);
+    });
+  })
+  .catch(error => {
+    console.error('Error al obtener las opciones de materias primas:', error);
+  });
+
   </script>
 
   {% endblock tail_js%}

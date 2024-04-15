@@ -1,4 +1,4 @@
-from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado, CorteCaja, CorteCajaVenta, Retiro
+from .Models import db, Galleta, Receta, RecetaMateriaIntermedia, MateriaPrima, Equivalencia, Venta, DetalleVenta,InventarioProductoTerminado, CorteCaja, CorteCajaVenta, Retiro,EquivalenciaMedida
 from sqlalchemy import func
 
 class GalletaDAO:
@@ -285,3 +285,16 @@ class RetiroDAO:
         except Exception as ex:
             raise Exception(ex)
 
+class MateriaPrimaDAO:
+    
+    @classmethod
+    def obtener_unidad_medida(cls, id_materia):
+        try:
+            unidad = db.session.query(EquivalenciaMedida.unidad).\
+                join(MateriaPrima, MateriaPrima.tipo_medida == EquivalenciaMedida.id_equivalencia).\
+                filter(MateriaPrima.id_materia == id_materia).scalar()
+            return unidad
+        except Exception as ex:
+            # Maneja las excepciones de la consulta
+            print(f"Error al obtener la unidad de medida: {ex}")
+            return None

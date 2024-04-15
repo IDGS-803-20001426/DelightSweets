@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 tickets_de_venta
 cortes_de_caja
+.env
+/env/

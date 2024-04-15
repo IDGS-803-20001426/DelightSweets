@@ -12,6 +12,8 @@
 - python -m venv .env
 - pip install -r requirements.txt
 - pip install flask flask-login flask-mysqldb flask-WTF
+- pip install flask-admin flask-login werkzeug security markupsafe sqlalchemy
+
 # Ejecutar la aplicación
 - py .\src\app.py
 

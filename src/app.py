@@ -22,7 +22,7 @@ import re
 import forms
 import base64
 import json
-from sqlalchemy import func, asc
+from sqlalchemy import func, asc,case,text
 import MySQLdb
 import json
 from flask_admin.form import FormOpts
@@ -30,16 +30,21 @@ from flask_admin.helpers import (get_form_data, validate_form_on_submit,
                                  get_redirect_target, flash_errors)
 from flask_admin.babel import gettext, ngettext
 from helpers import prettify_name, get_mdict_item_or_list
+from sqlalchemy import update,case,text
 
 
 
 # Models:
+<<<<<<< HEAD
 from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta , EquivalenciaMedida  
+=======
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta,DetalleVenta   
+>>>>>>> 36b344f2aed33191a17fff6a796498803a9ff134
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
 from models.produccionDao import ProduccionDAO
-from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO,MateriaPrimaDAO
 from config import DevelopmentConfig
 
 # PDF
@@ -1061,8 +1066,12 @@ class SolicitudProduccionForm(FlaskForm):
             galleta = receta.galleta
             if galleta:
                 inventario = sum([inventario.cantidad for inventario in galleta.inventarios])
+                
                 if inventario >= 50:
                     flash('La galleta asociada a esta receta tiene más de 50 en inventario, por lo cual no es posible continuar con tu solicitud.', 'warning')
+                    return False
+                if not materiaPrimaSuficiente(db,id_receta):
+                    flash('No hay la cantidad necesaria de ingredientes para elaborar esta receta.', 'warning')
                     return False
         return True
 
@@ -1083,7 +1092,7 @@ class SolicitudProduccionView(ModelView):
     column_list = ('id_receta', 'fecha_solicitud', 'fecha_terminacion', 'estatus')
 
     def is_accessible(self):
-        permiso = 9
+        permiso = 8
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_form_prefill(self, form, id):
@@ -1249,6 +1258,9 @@ import locale
 locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
 class VentasView(BaseView):
+    def is_accessible(self):
+        permiso = 12
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     @expose('/')
     def index(self):
         # Consulta las ventas por día desde tu base de datos usando SQLAlchemy
@@ -1282,10 +1294,145 @@ class VentasView(BaseView):
             labels_semanales.append(week_label)
             data_semanales.append(venta[2])  # Total de ventas por semana
 
+        #Galleta Más Vendida ----------------------------------------------------------------------------
+        consultaSql1 = text("""
+            SELECT d.id_galleta, 
+            g.nombre AS Nombre_Galleta,
+            SUM(CASE 
+                    WHEN d.medida = 'gramos' THEN 
+                        d.cantidad / (e.gramaje / e.piezas)
+                    ELSE d.cantidad
+                END
+                ) AS Cantidad_Vendida
+            FROM detalle_venta AS d
+            INNER JOIN galleta AS g ON d.id_galleta = g.id_galleta
+            INNER JOIN receta AS r ON g.id_galleta = r.id_galleta
+            INNER JOIN equivalencia AS e ON r.id_receta = e.id_receta
+            GROUP BY d.id_galleta, g.nombre
+            ORDER BY Cantidad_Vendida DESC
+            """)
+        
+        consulta_galleta_vendida = db.session.query(
+            Galleta.id_galleta,
+            Galleta.nombre.label('Nombre_Galleta'),
+            func.sum(
+                case(
+                    (DetalleVenta.medida == 'gramos', DetalleVenta.cantidad / (Equivalencia.gramaje / Equivalencia.piezas)),
+                    else_=DetalleVenta.cantidad
+                )
+            ).label('Cantidad_Vendida')
+        ).from_statement(consultaSql1)
+
+        # Ejecutar la consulta y obtener los resultados
+        resultadoGalletaMasVendida = consulta_galleta_vendida.all()
+
+        labels_galletaMasVendida = []
+        data_galletaMasVendida = []
+        for venta in resultadoGalletaMasVendida:
+            labels_galletaMasVendida.append(venta.Nombre_Galleta)
+            data_galletaMasVendida.append(str(venta.Cantidad_Vendida))
+
+        #Costo Producción Galleta -----------------------------------------------------------------------
+        consulta_sql = text("""
+            SELECT 
+                g.nombre AS galleta,
+                SUM(mp.costo * rmi.cantidad) / MAX(e.piezas) AS costo
+            FROM 
+                galleta g
+            JOIN 
+                receta r ON g.id_galleta = r.id_galleta
+            JOIN 
+                receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+            JOIN 
+                materia_prima mp ON rmi.id_materia = mp.id_materia
+            JOIN 
+                equivalencia AS e ON e.id_receta = r.id_receta
+            GROUP BY 
+                g.nombre
+            ORDER BY 
+                costo DESC
+        """)
+
+        consulta_costo_produccion = db.session.query(
+            Galleta.nombre.label('galleta'),
+            (func.sum(MateriaPrima.costo * RecetaMateriaIntermedia.cantidad) / func.max(Equivalencia.piezas)).label('costo')
+        ).from_statement(consulta_sql)
+
+        resultado = consulta_costo_produccion.all()
+
+        labels_galletaCostoProduccion = []
+        data_galletaCostoProduccion = []
+        for venta in resultado:
+            labels_galletaCostoProduccion.append(venta.galleta)
+            data_galletaCostoProduccion.append(str(venta.costo))
+
+
+        #Galleta que genera mas Utilidad -----------------------------------------------------------------------
+        consulta_sql = text("""
+            SELECT 
+                d.id_galleta, 
+                g.nombre AS Nombre_Galleta,
+                ROUND(SUM(CASE 
+                        WHEN d.medida = 'gramos' THEN 
+                            d.cantidad / (e.gramaje / e.piezas)
+                        ELSE 
+                            d.cantidad
+                        END
+                    ) * MAX(cpg.Utilidad), 2) AS Utilidad_Generada
+            FROM 
+                detalle_venta AS d
+            INNER JOIN 
+                galleta AS g ON d.id_galleta = g.id_galleta
+            INNER JOIN 
+                receta AS r ON g.id_galleta = r.id_galleta
+            INNER JOIN 
+                equivalencia AS e ON r.id_receta = e.id_receta
+            INNER JOIN (
+                SELECT 
+                    g.id_galleta AS id_galleta,
+                    g.nombre AS galleta,
+                    ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
+                    ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
+                    ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
+                FROM 
+                    galleta g
+                JOIN 
+                    receta r ON g.id_galleta = r.id_galleta
+                JOIN 
+                    receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+                JOIN 
+                    materia_prima mp ON rmi.id_materia = mp.id_materia
+                JOIN 
+                    equivalencia AS e ON e.id_receta = r.id_receta
+                GROUP BY 
+                    g.id_galleta,g.nombre
+                ) AS cpg ON g.id_galleta = cpg.id_galleta
+            GROUP BY 
+                d.id_galleta, g.nombre
+            ORDER BY 
+                Utilidad_Generada DESC
+            LIMIT 
+                10
+        """)
+
+        # Ejecutar la consulta
+        resultado = db.session.execute(consulta_sql)
+
+        labels_galletaUtilidad = []
+        data_galletaUtilidad = []
+        for venta in resultado:
+            labels_galletaUtilidad.append(venta.Nombre_Galleta)
+            data_galletaUtilidad.append(str(venta.Utilidad_Generada))
+
+
+
         # Renderizar el template con los datos
         return self.render('ventas.html', 
                            labels_diarias=labels_diarias, data_diarias=data_diarias,
-                           labels_semanales=labels_semanales, data_semanales=data_semanales)
+                           labels_semanales=labels_semanales, data_semanales=data_semanales,
+                           labels_galletaCostoProduccion=labels_galletaCostoProduccion,data_galletaCostoProduccion=data_galletaCostoProduccion,
+                           labels_galletaMasVendida=labels_galletaMasVendida,data_galletaMasVendida=data_galletaMasVendida,
+                           labels_galletaUtilidad=labels_galletaUtilidad,data_galletaUtilidad=data_galletaUtilidad)
         
 admin.add_view(VentasView(name='Análisis de Ventas', menu_icon_type='fa', menu_icon_value='fa-bar-chart', endpoint='ventas'))
 
@@ -1320,44 +1467,107 @@ def ejecutar_consulta_adicional():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/consultarStockBajo')
+def consulta():
+    try:
+        query = db.session.query(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre,
+                func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
+            ) \
+            .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
+            .group_by(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre
+            ) \
+            .having(func.sum(InventarioProductoTerminado.cantidad) < 10)
+            
+        results = query.all()
+        formatted_results = [{'id_galleta': row.id_galleta, 'nombre': row.nombre, 'cantidad': row.cantidad} for row in results]
+        # Devolver los resultados formateados como JSON
+        return jsonify(formatted_results), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()  # Rollback any changes made before the exception occurred
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/consultarGalletasCaducadas')
+def consultaCaducadas():
+    try:
+        # Calcular la fecha dos semanas y un día atrás
+        fecha_dos_semanas_un_dia_atras = datetime.now() - timedelta(days=15)
+
+        # Realizar la consulta
+        resultados = db.session.query(
+                        InventarioProductoTerminado.id_inventario_prod_terminado,
+                        InventarioProductoTerminado.id_galleta,
+                        InventarioProductoTerminado.fecha_produccion,
+                        InventarioProductoTerminado.cantidad,
+                        Galleta.nombre
+                    )\
+                     .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta)\
+                     .filter(InventarioProductoTerminado.estatus == 1)\
+                     .filter(InventarioProductoTerminado.fecha_produccion <= fecha_dos_semanas_un_dia_atras)
+            
+        results = resultados.all()
+
+        print(results)
+
+        formatted_results = [{'id_inventario_prod_terminado': row.id_inventario_prod_terminado,'id_galleta': row.id_galleta, 'nombre': row.nombre, 'cantidad': row.cantidad, 'fecha_produccion': row.fecha_produccion} for row in results]
+        # Devolver los resultados formateados como JSON
+        return jsonify(formatted_results), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()  # Rollback any changes made before the exception occurred
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/actualizar_estado', methods=['POST'])
+def actualizar_estado():
+    data = request.get_json()  # Obtener los datos enviados desde el frontend
+    checks_seleccionados = data.get('checks')  # Obtener los valores de los checks seleccionados
+    
+    try:
+        db.session.query(InventarioProductoTerminado).filter(InventarioProductoTerminado.id_inventario_prod_terminado.in_(checks_seleccionados)).update({'estatus': 0}, synchronize_session=False)
+        
+        # Insertar registros en la tabla "merma_prod_terminado"
+        for id_inventario in checks_seleccionados:
+            # Obtener el registro de InventarioProductoTerminado
+            producto = db.session.query(InventarioProductoTerminado).filter_by(id_inventario_prod_terminado=id_inventario).first()
+            # Crear un nuevo registro de MermaProdTerminado
+            merma = MermaProdTerminado(
+                id_inventario_prod_terminado=id_inventario,
+                cantidad=producto.cantidad,
+                fecha=datetime.now(),
+                motivo='Caducidad'
+            )
+            db.session.add(merma)
+        
+        db.session.commit()
+        return jsonify({"mensaje": "Los registros fueron actualizados y la merma fue registrada correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 class InventarioProductoTerminadoView(ModelView): 
     create_template = 'admin/traducciones/create_general.html'
     list_template = 'admin/traducciones/list_general.html'
     edit_template = 'admin/traducciones/edit_general.html'      
     def _handle_view(self, name, **kwargs):
-        # Este método se ejecutará cada vez que un usuario acceda a esta vista
-        print("El usuario ha ingresado a la vista de InventarioProductoTerminado")
-        # Puedes agregar aquí cualquier otra acción que desees realizar, como ejecutar una consulta SQL
         query = db.session.query(
-                    InventarioProductoTerminado.id_galleta,
-                    Galleta.nombre,
-                    func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
-                ) \
-                .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
-                .filter(InventarioProductoTerminado.estatus == 1) \
-                .group_by(
-                    InventarioProductoTerminado.id_galleta,
-                    Galleta.nombre
-                )
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre,
+                func.sum(InventarioProductoTerminado.cantidad).label('cantidad')
+            ) \
+            .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta) \
+            .group_by(
+                InventarioProductoTerminado.id_galleta,
+                Galleta.nombre
+            ) \
+            .having(func.sum(InventarioProductoTerminado.cantidad) < 10)
         
         # Ejecutar la consulta y obtener los resultados
         results = query.all()
-        
-        mensaje = '¡Galletas con stock bajo! '
-        cont = 0
 
-        # Haz lo que necesites con los resultados
-        # Iterar sobre los resultados
-        for row in results:
-            # Verificar si el campo cantidad es menor a 10
-            if row.cantidad < 10:
-                # Mostrar un mensaje en la vista
-                mensaje += f"{row.nombre} - {row.cantidad}pz, "
-                cont = cont + 1
-        
-        if cont > 0:
-            mensaje += f". Le sugerimos realizar una solicitud de producción."
-            flash(mensaje, 'warning')
+        if len(results) > 0:
+            flash(Markup(f"¡Tienes galletas con stock bajo! <button id='btnStockBajo' class='btn btn-primary'>Ver galletas</button>"), 'warning')
 
         # Calcular la fecha dos semanas y un día atrás
         fecha_dos_semanas_un_dia_atras = datetime.now() - timedelta(days=15)
@@ -1367,14 +1577,9 @@ class InventarioProductoTerminadoView(ModelView):
                      .join(Galleta, Galleta.id_galleta == InventarioProductoTerminado.id_galleta)\
                      .filter(InventarioProductoTerminado.estatus == 1)\
                      .filter(InventarioProductoTerminado.fecha_produccion <= fecha_dos_semanas_un_dia_atras).all()
-        
-        for r in resultados:
-            #flash(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}.", "warning")
-            # Generar una URL con los IDs de inventario como parámetros
-            url_ejecutar_consulta_adicional = url_for('ejecutar_consulta_adicional', ids_inventario=','.join(str(r.InventarioProductoTerminado.id_inventario_prod_terminado) for r in resultados))
 
-            token_csrf = generate_csrf()  # Generar el token CSRF
-            flash(Markup(f"El lote {r.InventarioProductoTerminado.id_inventario_prod_terminado} de la {r.Galleta.nombre} se considera caducado. Fecha producción {r.InventarioProductoTerminado.fecha_produccion}. <form id='miFormulario'><input type='hidden' name='csrf_token' value='{token_csrf}'><input type='hidden' name='idInventario' value='{r.InventarioProductoTerminado.id_inventario_prod_terminado}'><button type='submit' class='btn btn-primary' id='registro_merma'>Mover lote a merma</button></form>"), 'error')
+        if len(resultados) > 0:
+            flash(Markup(f"¡Tienes galletas caducadas! <button id='btnGalletasCaducadas' class='btn btn-primary'>Ver galletas</button>"), "error")
 
     def _format_image(view, context, model, name):
         if model.imagen:
@@ -1419,7 +1624,8 @@ class InventarioProductoTerminadoView(ModelView):
         )
 
     def is_accessible(self):
-        return current_user.is_authenticated
+        permiso = 9
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     # Desactivar operaciones de CRUD
     can_create = False
@@ -1576,8 +1782,25 @@ class GalletaView(ModelView):
         'costo_total_materias_primas': 'Costo Producción',
     }
 
+    def delete_model(self, model):
+        """
+        Verifica si se puede eliminar una galleta.
+        """
+        # Verifica si la galleta tiene una relación en la tabla de Receta
+        if model.recetas:
+            flash("No se puede eliminar la galleta porque tiene una receta asociada.", "error")
+            return False
+
+        # Verifica si la galleta tiene una relación en la tabla de InventarioProductoTerminado
+        if model.inventarios:
+            flash("No se puede eliminar la galleta porque tiene registros en el inventario de producto terminado.", "error")
+            return False
+
+        # Si no se encontraron relaciones, se puede eliminar la galleta
+        return super().delete_model(model)
+
     def is_accessible(self):
-        permiso = 10
+        permiso = 13
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_model_change(self, form, model, is_created):
@@ -1802,14 +2025,15 @@ class RecetaView(ModelView):
 
     form = RecetaForm
     form_columns = ('btn_materia')
+
     def is_accessible(self):
         permiso = 6
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+    
     def render(self, template, **kwargs):
         rendered = super().render(template, **kwargs)
         return rendered.replace('<form ', '<form id="daniel"')
     
-
     def _materias_primas_formatter(self, context, model, name):
         # Crear una lista de cadenas formateadas que contienen el nombre de la materia prima y la cantidad
         materias_primas = []
@@ -1827,6 +2051,26 @@ class RecetaView(ModelView):
     }
 
     column_list = ('nombre_receta', 'galleta', 'materias_primas', 'gramaje', 'piezas')
+
+    def tiene_solicitudes_de_produccion(self, receta):
+        # Realizar la consulta para contar las solicitudes de producción asociadas a la receta
+        count = db.session.query(func.count()).filter(SolicitudProduccion.id_receta == receta.id_receta).scalar()
+        
+        # Si el recuento es mayor que cero, hay solicitudes de producción asociadas
+        return count > 0
+    
+    def delete_model(self, model):
+        """
+        Verifica si se puede eliminar una receta.
+        """
+        # Verificar si hay solicitudes de producción asociadas indirectamente
+        # Esto podría ser a través de otras tablas relacionadas
+        if self.tiene_solicitudes_de_produccion(model):
+            flash("No se puede eliminar la receta porque tiene solicitudes de producción asociadas.", "error")
+            return False
+
+        # Si no hay solicitudes de producción asociadas, se puede eliminar la receta
+        return super().delete_model(model)
 
     def is_accessible(self):
         return current_user.is_authenticated
@@ -1886,27 +2130,51 @@ class RecetaView(ModelView):
         model.equivalencias.gramaje = form.gramaje.data 
 
     def after_model_change(self, form, model, is_created):
-        RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
-        json_materias = json.loads(form.datos_materias_primas.data)  
-        print(form.datos_materias_primas.data)
-        for objeto in json_materias:
-            print(objeto)
-        # Acceder a los valores de cada objeto
-            id_materia = objeto['id_materia']
-            cantidad_materia = objeto['cantidad']
+    # Si es una operación de creación o edición, actualiza el campo gramaje de la galleta
+        if is_created or not is_created:  # Revisa si se está creando o editando el modelo
+            # Elimina y reagrega las RecetaMateriaIntermedia relacionadas con la receta
+            RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
+            json_materias = json.loads(form.datos_materias_primas.data)  
+            for objeto in json_materias:
+                id_materia = objeto['id_materia']
+                cantidad_materia = objeto['cantidad']
 
-            # Crear una nueva instancia de RecetaMateriaIntermedia
-            receta_materia = RecetaMateriaIntermedia(
-                id_receta=model.id_receta,
-                id_materia=id_materia,
-                cantidad=cantidad_materia
-            )
+                # Crear una nueva instancia de RecetaMateriaIntermedia
+                receta_materia = RecetaMateriaIntermedia(
+                    id_receta=model.id_receta,
+                    id_materia=id_materia,
+                    cantidad=cantidad_materia
+                )
+                # Agregar el objeto a la sesión de la base de datos
+                db.session.add(receta_materia)
+                
+            # Calcula el nuevo valor de gramaje para la galleta
+            if model.equivalencias and model.equivalencias.piezas != 0:
+                nuevo_gramaje_galleta = model.equivalencias.gramaje / model.equivalencias.piezas
+            else:
+                nuevo_gramaje_galleta = 0
             
-            # Agregar el objeto a la sesión de la base de datos
-            db.session.add(receta_materia)
+            # Actualiza el valor de gramaje en la tabla de galleta asociada
+            if model.galleta:
+                stmt = (
+                    update(Galleta)
+                    .where(Galleta.id_galleta == model.id_galleta)
+                    .values(gramaje=nuevo_gramaje_galleta)
+                )
+                db.session.execute(stmt)
             
-        # Confirmar los cambios para guardar los objetos en la base de datos
+            # Confirmar los cambios para guardar los objetos en la base de datos
+            db.session.commit()
+    
+    def on_model_delete(self, model):
+        # Eliminar las filas asociadas en RecetaMateriaIntermedia
+        RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
+
+        # Confirmar los cambios en la base de datos
         db.session.commit()
+
+        # Llamar al método de eliminación de la clase base para eliminar la receta
+        return super().on_model_delete(model)
 
     @expose('/new/', methods=('GET', 'POST'))
     def create_view(self):
@@ -2122,6 +2390,10 @@ class MermaProdTerminadoView(ModelView):
     column_formatters = {
         'galleta': lambda v, c, m, p: m.inventario_prod_terminado.galleta.nombre if m.inventario_prod_terminado else "Galleta Desconocida"
     }
+
+    def is_accessible(self):
+        permiso = 11
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def _inv_galleta_ind(self, id_galleta_param):
         return (
@@ -2392,6 +2664,9 @@ class MermaProduccionView(ModelView):
         'id_materia': lambda v, c, m, p: m.materia_prima.nombre if m.materia_prima else "Galleta Desconocida"
     }
 
+    def is_accessible(self):
+        permiso = 11
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
 
     def on_model_change(self, form, model, is_created):
         if form.tipo_merma_materia.data == "1":
@@ -2702,6 +2977,11 @@ class CompraView(ModelView):
     column_list = ('nombre_producto', 'cantidad', 'precio_compra', 'fecha_compra', 'fecha_caducidad', 'nombre_proveedor')
     create_template = 'admin/create.html'
  
+    def is_accessible(self):
+        permiso = 4
+        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+
+
     def on_model_change(self, form, model, is_created):
         # Obtener el nombre del producto seleccionado en el formulario
         id_producto = form.nombre_producto.data
@@ -2912,8 +3192,8 @@ admin_blueprints = [
     SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus', name="Solicitud Producción"),
     InventarioProductoTerminadoView(InventarioProductoTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-calculator', name="Inventario en venta"),
     GalletaView(Galleta, db.session, menu_icon_type='fa', menu_icon_value='fa-cutlery', name="Galletas"),
-    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o', name="Merma Galletas"),
-    MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"),
+    MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value="fa-arrow-down", name="Merma Galletas"),
+    MermaProduccionView(MermaProduccion, db.session, menu_icon_type='fa', menu_icon_value="fa-thumbs-down", name="Merma Materias"),
     CompraView(Compra, db.session, menu_icon_type='fa', menu_icon_value='fa-shopping-cart', name="Compras")
 ]
 # Agrega tus blueprints a Flask-Admin
@@ -2969,19 +3249,25 @@ def produccion():
             return jsonify({'errors': mensajes_error})
 
         #Permite actualizar el estatus del registro
-        ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+        if estatus == 0 or estatus == 2:
+            ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+        
         #Obtener datos producción & receta-------------------------------------------------
         datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
         numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
         #Insertar inventario_producto_terminado
         ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
         if estatus == 1:
-            actualizarInventario(db, datosReceta.id_receta)
+            respuesta = actualizarInventario(db, datosReceta.id_receta)
+            if not respuesta:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,'Cancelada')
+                mensajes_error.append("No existe materia prima suficiente para procesar la solicitud, por lo cual fue cancelada.")
+                return jsonify({'errors': mensajes_error})
+            else:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
         
         return jsonify({'exito': 'ok'})
     return render_template('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
-
- 
 
 
 class ProduccionAdminView(BaseView):
@@ -3015,20 +3301,28 @@ class ProduccionAdminView(BaseView):
                 return jsonify({'errors': mensajes_error})
 
             #Permite actualizar el estatus del registro
-            ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+            if estatus == 0 or estatus == 2:
+                ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
+            
             #Obtener datos producción & receta-------------------------------------------------
             datosSolicitud, datosReceta = ProduccionDAO.obtenerSolicitudPorID(db, idProd)
             numPiezas = ProduccionDAO.obtenerNumeroPiezasPorReceta(db,datosSolicitud.id_receta)
             #Insertar inventario_producto_terminado
             ProduccionDAO.insertarRegistroInventarioProductoTerminado(db,datosReceta.id_galleta,numPiezas,estatus)
             if estatus == 1:
-                actualizarInventario(db, datosReceta.id_receta)
+                respuesta = actualizarInventario(db, datosReceta.id_receta)
+                if not respuesta:
+                    ProduccionDAO.actualizarEstatusYFecha(db,idProd,'Cancelada')
+                    mensajes_error.append("No existe materia prima suficiente para procesar la solicitud, por lo cual fue cancelada.")
+                    return jsonify({'errors': mensajes_error})
+                else:
+                    ProduccionDAO.actualizarEstatusYFecha(db,idProd,estatusTexto)
             
             return jsonify({'exito': 'ok'})
         return self.render('admin/moduloProduccion.html', form=form, modProduccion=modProduccion)
 
 # Registrar la vista de Flask-Admin para tu blueprint produccion_bp
-admin.add_view(ProduccionAdminView(name='Produccion', endpoint='produccion_admin'))
+admin.add_view(ProduccionAdminView(name='Produccion', endpoint='produccion_admin', menu_icon_type="fa", menu_icon_value="fa-industry"))
 
 def actualizarInventario(db, id_receta):
     # Obtener las materias primas requeridas por la receta
@@ -3046,7 +3340,7 @@ def actualizarInventario(db, id_receta):
         cantidad_disponible_total = sum(item.cantidad for item in inventario)
         if cantidad_disponible_total < cantidad_requerida:
             print(f"No hay suficiente cantidad disponible de la materia prima con ID {id_materia}.")
-            continue
+            return False
         
         # Consumir la cantidad necesaria de la materia prima
         cantidad_consumida = 0
@@ -3065,7 +3359,32 @@ def actualizarInventario(db, id_receta):
         
         # Guardar los cambios en la base de datos para esta materia prima
         db.session.commit()
+    return True
 
+def materiaPrimaSuficiente(db, id_receta):
+    # Obtener las materias primas requeridas por la receta
+    materias_primas_requeridas = ProduccionDAO.obtenerMateriasPrimasPorReceta(db, id_receta)
+    for materia_prima in materias_primas_requeridas:
+        id_materia = materia_prima.id_materia
+        cantidad_requerida = materia_prima.cantidad
+        
+        # Obtener el inventario de la materia prima ordenado por fecha de caducidad
+        inventario = ProduccionDAO.obtenerMateriasPrimasInventario(db, id_materia)
+        
+        # Verificar si hay suficiente cantidad disponible en el inventario
+        cantidad_disponible_total = sum(item.cantidad for item in inventario)
+        if cantidad_disponible_total < cantidad_requerida:
+            print(f"No hay suficiente cantidad disponible de la materia prima con ID {id_materia}.")
+            return False
+    return True
+
+@app.route('/obtenerUnidadMedidaMateriaPrima', methods=['GET', 'POST'])
+def obtenerUnidadMedidaMateriaPrima():
+    materia_id = request.args.get('materia_id')  # Recibe el parámetro de ID de materia
+    print("--------------------------------------------{}".format(materia_id))
+    # Realiza la consulta y el join
+    unidad = MateriaPrimaDAO.obtener_unidad_medida(materia_id)
+    return jsonify({'unidad': unidad})
 
 
 
@@ -3289,6 +3608,7 @@ def ventasCorte():
 
 
 class VenderView(BaseView):
+    
     @expose('/', methods=['GET', 'POST'])
     def index(self):
         galletas = GalletaDAO.get_costo_galletas()
@@ -3327,7 +3647,7 @@ class VenderView(BaseView):
 
         return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
         
-admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin'))
+admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin', menu_icon_type="fa", menu_icon_value="fa-dollar-sign"))
 # -------------- INSERTAR RETIRO --------------
 def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
     try:
