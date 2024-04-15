@@ -30,6 +30,7 @@ from flask_admin.helpers import (get_form_data, validate_form_on_submit,
                                  get_redirect_target, flash_errors)
 from flask_admin.babel import gettext, ngettext
 from helpers import prettify_name, get_mdict_item_or_list
+from sqlalchemy import update
 
 
 
@@ -1642,6 +1643,23 @@ class GalletaView(ModelView):
         'costo_total_materias_primas': 'Costo Producción',
     }
 
+    def delete_model(self, model):
+        """
+        Verifica si se puede eliminar una galleta.
+        """
+        # Verifica si la galleta tiene una relación en la tabla de Receta
+        if model.recetas:
+            flash("No se puede eliminar la galleta porque tiene una receta asociada.", "error")
+            return False
+
+        # Verifica si la galleta tiene una relación en la tabla de InventarioProductoTerminado
+        if model.inventarios:
+            flash("No se puede eliminar la galleta porque tiene registros en el inventario de producto terminado.", "error")
+            return False
+
+        # Si no se encontraron relaciones, se puede eliminar la galleta
+        return super().delete_model(model)
+
     def is_accessible(self):
         permiso = 13
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
@@ -1877,7 +1895,6 @@ class RecetaView(ModelView):
         rendered = super().render(template, **kwargs)
         return rendered.replace('<form ', '<form id="daniel"')
     
-
     def _materias_primas_formatter(self, context, model, name):
         # Crear una lista de cadenas formateadas que contienen el nombre de la materia prima y la cantidad
         materias_primas = []
@@ -1895,6 +1912,26 @@ class RecetaView(ModelView):
     }
 
     column_list = ('nombre_receta', 'galleta', 'materias_primas', 'gramaje', 'piezas')
+
+    def tiene_solicitudes_de_produccion(self, receta):
+        # Realizar la consulta para contar las solicitudes de producción asociadas a la receta
+        count = db.session.query(func.count()).filter(SolicitudProduccion.id_receta == receta.id_receta).scalar()
+        
+        # Si el recuento es mayor que cero, hay solicitudes de producción asociadas
+        return count > 0
+    
+    def delete_model(self, model):
+        """
+        Verifica si se puede eliminar una receta.
+        """
+        # Verificar si hay solicitudes de producción asociadas indirectamente
+        # Esto podría ser a través de otras tablas relacionadas
+        if self.tiene_solicitudes_de_produccion(model):
+            flash("No se puede eliminar la receta porque tiene solicitudes de producción asociadas.", "error")
+            return False
+
+        # Si no hay solicitudes de producción asociadas, se puede eliminar la receta
+        return super().delete_model(model)
 
     def is_accessible(self):
         return current_user.is_authenticated
@@ -1954,27 +1991,51 @@ class RecetaView(ModelView):
         model.equivalencias.gramaje = form.gramaje.data 
 
     def after_model_change(self, form, model, is_created):
-        RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
-        json_materias = json.loads(form.datos_materias_primas.data)  
-        print(form.datos_materias_primas.data)
-        for objeto in json_materias:
-            print(objeto)
-        # Acceder a los valores de cada objeto
-            id_materia = objeto['id_materia']
-            cantidad_materia = objeto['cantidad']
+    # Si es una operación de creación o edición, actualiza el campo gramaje de la galleta
+        if is_created or not is_created:  # Revisa si se está creando o editando el modelo
+            # Elimina y reagrega las RecetaMateriaIntermedia relacionadas con la receta
+            RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
+            json_materias = json.loads(form.datos_materias_primas.data)  
+            for objeto in json_materias:
+                id_materia = objeto['id_materia']
+                cantidad_materia = objeto['cantidad']
 
-            # Crear una nueva instancia de RecetaMateriaIntermedia
-            receta_materia = RecetaMateriaIntermedia(
-                id_receta=model.id_receta,
-                id_materia=id_materia,
-                cantidad=cantidad_materia
-            )
+                # Crear una nueva instancia de RecetaMateriaIntermedia
+                receta_materia = RecetaMateriaIntermedia(
+                    id_receta=model.id_receta,
+                    id_materia=id_materia,
+                    cantidad=cantidad_materia
+                )
+                # Agregar el objeto a la sesión de la base de datos
+                db.session.add(receta_materia)
+                
+            # Calcula el nuevo valor de gramaje para la galleta
+            if model.equivalencias and model.equivalencias.piezas != 0:
+                nuevo_gramaje_galleta = model.equivalencias.gramaje / model.equivalencias.piezas
+            else:
+                nuevo_gramaje_galleta = 0
             
-            # Agregar el objeto a la sesión de la base de datos
-            db.session.add(receta_materia)
+            # Actualiza el valor de gramaje en la tabla de galleta asociada
+            if model.galleta:
+                stmt = (
+                    update(Galleta)
+                    .where(Galleta.id_galleta == model.id_galleta)
+                    .values(gramaje=nuevo_gramaje_galleta)
+                )
+                db.session.execute(stmt)
             
-        # Confirmar los cambios para guardar los objetos en la base de datos
+            # Confirmar los cambios para guardar los objetos en la base de datos
+            db.session.commit()
+    
+    def on_model_delete(self, model):
+        # Eliminar las filas asociadas en RecetaMateriaIntermedia
+        RecetaMateriaIntermedia.query.filter_by(id_receta=model.id_receta).delete()
+
+        # Confirmar los cambios en la base de datos
         db.session.commit()
+
+        # Llamar al método de eliminación de la clase base para eliminar la receta
+        return super().on_model_delete(model)
 
     @expose('/new/', methods=('GET', 'POST'))
     def create_view(self):
