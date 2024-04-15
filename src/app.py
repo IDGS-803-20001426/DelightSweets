@@ -22,7 +22,7 @@ import re
 import forms
 import base64
 import json
-from sqlalchemy import func, asc
+from sqlalchemy import func, asc,case,text
 import MySQLdb
 import json
 from flask_admin.form import FormOpts
@@ -30,12 +30,12 @@ from flask_admin.helpers import (get_form_data, validate_form_on_submit,
                                  get_redirect_target, flash_errors)
 from flask_admin.babel import gettext, ngettext
 from helpers import prettify_name, get_mdict_item_or_list
-from sqlalchemy import update
+from sqlalchemy import update,case,text
 
 
 
 # Models:
-from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta   
+from models.Models import db,User,PermisoRol, Permiso, Rol,Proveedor,SolicitudProduccion, Receta, InventarioProductoTerminado, Galleta, MateriaPrima, RecetaMateriaIntermedia,MermaProdTerminado, Equivalencia, MermaProduccion, Inventario, Compra, Venta,DetalleVenta   
 from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
@@ -1290,10 +1290,145 @@ class VentasView(BaseView):
             labels_semanales.append(week_label)
             data_semanales.append(venta[2])  # Total de ventas por semana
 
+        #Galleta Más Vendida ----------------------------------------------------------------------------
+        consultaSql1 = text("""
+            SELECT d.id_galleta, 
+            g.nombre AS Nombre_Galleta,
+            SUM(CASE 
+                    WHEN d.medida = 'gramos' THEN 
+                        d.cantidad / (e.gramaje / e.piezas)
+                    ELSE d.cantidad
+                END
+                ) AS Cantidad_Vendida
+            FROM detalle_venta AS d
+            INNER JOIN galleta AS g ON d.id_galleta = g.id_galleta
+            INNER JOIN receta AS r ON g.id_galleta = r.id_galleta
+            INNER JOIN equivalencia AS e ON r.id_receta = e.id_receta
+            GROUP BY d.id_galleta, g.nombre
+            ORDER BY Cantidad_Vendida DESC
+            """)
+        
+        consulta_galleta_vendida = db.session.query(
+            Galleta.id_galleta,
+            Galleta.nombre.label('Nombre_Galleta'),
+            func.sum(
+                case(
+                    (DetalleVenta.medida == 'gramos', DetalleVenta.cantidad / (Equivalencia.gramaje / Equivalencia.piezas)),
+                    else_=DetalleVenta.cantidad
+                )
+            ).label('Cantidad_Vendida')
+        ).from_statement(consultaSql1)
+
+        # Ejecutar la consulta y obtener los resultados
+        resultadoGalletaMasVendida = consulta_galleta_vendida.all()
+
+        labels_galletaMasVendida = []
+        data_galletaMasVendida = []
+        for venta in resultadoGalletaMasVendida:
+            labels_galletaMasVendida.append(venta.Nombre_Galleta)
+            data_galletaMasVendida.append(str(venta.Cantidad_Vendida))
+
+        #Costo Producción Galleta -----------------------------------------------------------------------
+        consulta_sql = text("""
+            SELECT 
+                g.nombre AS galleta,
+                SUM(mp.costo * rmi.cantidad) / MAX(e.piezas) AS costo
+            FROM 
+                galleta g
+            JOIN 
+                receta r ON g.id_galleta = r.id_galleta
+            JOIN 
+                receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+            JOIN 
+                materia_prima mp ON rmi.id_materia = mp.id_materia
+            JOIN 
+                equivalencia AS e ON e.id_receta = r.id_receta
+            GROUP BY 
+                g.nombre
+            ORDER BY 
+                costo DESC
+        """)
+
+        consulta_costo_produccion = db.session.query(
+            Galleta.nombre.label('galleta'),
+            (func.sum(MateriaPrima.costo * RecetaMateriaIntermedia.cantidad) / func.max(Equivalencia.piezas)).label('costo')
+        ).from_statement(consulta_sql)
+
+        resultado = consulta_costo_produccion.all()
+
+        labels_galletaCostoProduccion = []
+        data_galletaCostoProduccion = []
+        for venta in resultado:
+            labels_galletaCostoProduccion.append(venta.galleta)
+            data_galletaCostoProduccion.append(str(venta.costo))
+
+
+        #Galleta que genera mas Utilidad -----------------------------------------------------------------------
+        consulta_sql = text("""
+            SELECT 
+                d.id_galleta, 
+                g.nombre AS Nombre_Galleta,
+                ROUND(SUM(CASE 
+                        WHEN d.medida = 'gramos' THEN 
+                            d.cantidad / (e.gramaje / e.piezas)
+                        ELSE 
+                            d.cantidad
+                        END
+                    ) * MAX(cpg.Utilidad), 2) AS Utilidad_Generada
+            FROM 
+                detalle_venta AS d
+            INNER JOIN 
+                galleta AS g ON d.id_galleta = g.id_galleta
+            INNER JOIN 
+                receta AS r ON g.id_galleta = r.id_galleta
+            INNER JOIN 
+                equivalencia AS e ON r.id_receta = e.id_receta
+            INNER JOIN (
+                SELECT 
+                    g.id_galleta AS id_galleta,
+                    g.nombre AS galleta,
+                    ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
+                    ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
+                    ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
+                FROM 
+                    galleta g
+                JOIN 
+                    receta r ON g.id_galleta = r.id_galleta
+                JOIN 
+                    receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+                JOIN 
+                    materia_prima mp ON rmi.id_materia = mp.id_materia
+                JOIN 
+                    equivalencia AS e ON e.id_receta = r.id_receta
+                GROUP BY 
+                    g.id_galleta,g.nombre
+                ) AS cpg ON g.id_galleta = cpg.id_galleta
+            GROUP BY 
+                d.id_galleta, g.nombre
+            ORDER BY 
+                Utilidad_Generada DESC
+            LIMIT 
+                10
+        """)
+
+        # Ejecutar la consulta
+        resultado = db.session.execute(consulta_sql)
+
+        labels_galletaUtilidad = []
+        data_galletaUtilidad = []
+        for venta in resultado:
+            labels_galletaUtilidad.append(venta.Nombre_Galleta)
+            data_galletaUtilidad.append(str(venta.Utilidad_Generada))
+
+
+
         # Renderizar el template con los datos
         return self.render('ventas.html', 
                            labels_diarias=labels_diarias, data_diarias=data_diarias,
-                           labels_semanales=labels_semanales, data_semanales=data_semanales)
+                           labels_semanales=labels_semanales, data_semanales=data_semanales,
+                           labels_galletaCostoProduccion=labels_galletaCostoProduccion,data_galletaCostoProduccion=data_galletaCostoProduccion,
+                           labels_galletaMasVendida=labels_galletaMasVendida,data_galletaMasVendida=data_galletaMasVendida,
+                           labels_galletaUtilidad=labels_galletaUtilidad,data_galletaUtilidad=data_galletaUtilidad)
         
 admin.add_view(VentasView(name='Análisis de Ventas', menu_icon_type='fa', menu_icon_value='fa-bar-chart', endpoint='ventas'))
 
@@ -3405,9 +3540,7 @@ def ventasCorte():
 
 
 class VenderView(BaseView):
-    def is_accessible(self):
-        permiso = 10
-        return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
+    
     @expose('/', methods=['GET', 'POST'])
     def index(self):
         galletas = GalletaDAO.get_costo_galletas()

@@ -35,6 +35,21 @@
     <h2>Ventas Semanales</h2>
     <canvas id="ventasSemanalesChart"></canvas>
 </div>
+
+<div class="chart-container">
+    <h2>Costo Producción por Galleta</h2>
+    <canvas id="costoProdGalletaChart"></canvas>
+</div>
+
+<div class="chart-container">
+    <h2>Galleta Más Vendida</h2>
+    <canvas id="galletaMasVendidaChart"></canvas>
+</div>
+
+<div class="chart-container">
+    <h2>Utilidad Galleta</h2>
+    <canvas id="galletaUtilidadChart"></canvas>
+</div>
   
 <script>
     // Gráfico de Ventas Diarias
@@ -78,6 +93,98 @@
             scales: {
                 y: {
                     beginAtZero: true
+                }
+            }
+        }
+    });
+    // Gráfico de Galleta más vendida
+    const ctxGalletaMasVendida = document.getElementById('galletaMasVendidaChart');
+    new Chart(ctxGalletaMasVendida, {
+        type: 'bar',
+        data: {
+            labels: {{ labels_galletaMasVendida | tojson }},
+            datasets: [{
+                label: '# de Cantidad Vendidas',
+                
+                data: {{ data_galletaMasVendida | tojson }},
+                backgroundColor: 'rgb(255, 99, 132)',
+                borderColor: 'rgba(245, 211, 23, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje y
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje x
+                    }
+                }
+            }
+
+        }
+    });
+    // Gráfico de Costo Produccion por Galleta
+    const ctxGalletaProdCosto = document.getElementById('costoProdGalletaChart');
+    new Chart(ctxGalletaProdCosto, {
+        type: 'bar',
+        data: {
+            labels: {{ labels_galletaCostoProduccion | tojson }},
+            datasets: [{
+                label: '# de Costo Produccion',
+                data: {{ data_galletaCostoProduccion | tojson }},
+                backgroundColor: 'rgb(75, 192, 192)',
+                borderColor: 'rgba(38, 0, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje y
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje x
+                    }
+                }
+            }
+        }
+    });
+    // Gráfico de Galleta con más utilidad
+    const ctxGalletaUtilidad = document.getElementById('galletaUtilidadChart');
+    new Chart(ctxGalletaUtilidad, {
+        type: 'bar',
+        data: {
+            labels: {{ labels_galletaUtilidad | tojson }},
+            datasets: [{
+                label: '# de Costo Produccion',
+                data: {{ data_galletaUtilidad | tojson }},
+                backgroundColor: 'rgb(75, 192, 192)',
+                borderColor: 'rgba(38, 0, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje y
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'white' // Cambiar el color de las etiquetas en el eje x
+                    }
                 }
             }
         }

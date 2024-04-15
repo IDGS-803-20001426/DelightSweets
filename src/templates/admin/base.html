@@ -693,6 +693,10 @@
         $("#error-cantidad").append("Se necesita una cantidad");
         return;
       }
+      if (nombre == "Selecciona una materia") {
+        $("#error-cantidad").html("Por favor, selecciona una materia.");
+        return;
+      }
 
       var fechaActual = new Date();
       var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
@@ -708,38 +712,53 @@
     });
 
     $("#btn_modal").click(function () {
-      $("#materiasPrimasSeleccionadas").html("");
+        $("#materiasPrimasSeleccionadas").html("");
 
-      var datos = $("#datos_materias_primas").val();
-      var datos_json = JSON.parse(datos);
-
-      var fechaActual = new Date();
-      var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
-      datos_json.forEach(function (materias) {
-        $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + materias['id_materia'] +
-          "</td><td style='padding: 2px;'>" + materias['materia'] + "</td><td style='padding: 2px;'>" +
-          materias['cantidad'] +
-          "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual
-          .getTime() + numeroAleatorio + "'>Eliminar</button></td></tr>")
-      });
-
+        var datos = $("#datos_materias_primas").val();
+        if (datos.trim() !== "") {
+            var datos_json = JSON.parse(datos);
+            console.log(datos_json);
+            var fechaActual = new Date();
+            var numeroAleatorio = Math.floor(10000 + Math.random() * 90000);
+            datos_json.forEach(function (materias) {
+                $("#materiasPrimasSeleccionadas").append("<tr><td style='display: none;'>" + materias['id_materia'] +
+                    "</td><td style='padding: 2px;'>" + materias['Materia'] + "</td><td style='padding: 2px;'>" +
+                    materias['Cantidad'] +
+                    "</td><td style='padding: 2px;'><button class='eliminar btn btn-danger' id='" + fechaActual
+                    .getTime() + numeroAleatorio + "'>Eliminar</button></td></tr>")
+            });
+        } else {
+            console.error("Los datos de materias primas están vacíos.");
+        }
     });
 
+
     fetch('/materias_primas')
-      .then(response => response.json())
-      .then(data => {
-        // Llenar el campo de selección con las opciones recibidas
-        const select = document.getElementById('selectMateriasPrimas');
-        data.forEach(opcion => {
-          const option = document.createElement('option');
-          option.value = opcion.id;
-          option.text = opcion.nombre;
-          select.appendChild(option);
-        });
-      })
-      .catch(error => {
-        console.error('Error al obtener las opciones de materias primas:', error);
-      });
+  .then(response => response.json())
+  .then(data => {
+    // Llenar el campo de selección con las opciones recibidas
+    const select = document.getElementById('selectMateriasPrimas');
+
+    // Agregar la opción por defecto
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.text = 'Selecciona una materia';
+    defaultOption.selected = true; // Para que aparezca seleccionada por defecto
+    defaultOption.disabled = true; // Para que no sea seleccionable
+    select.appendChild(defaultOption);
+
+    // Llenar el campo de selección con las opciones recibidas
+    data.forEach(opcion => {
+      const option = document.createElement('option');
+      option.value = opcion.id;
+      option.text = opcion.nombre;
+      select.appendChild(option);
+    });
+  })
+  .catch(error => {
+    console.error('Error al obtener las opciones de materias primas:', error);
+  });
+
   </script>
 
   {% endblock tail_js%}
