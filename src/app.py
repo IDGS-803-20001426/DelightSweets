@@ -40,7 +40,7 @@ from models.entities.User import Usuario
 from models.usersDao import UserDAO
 from models.recetaDao import RecetaDAO
 from models.produccionDao import ProduccionDAO
-from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO,MateriaPrimaDAO
+from models.galletaDao import GalletaDAO,DetalleVentaDAO,VentaDAO,InventarioProductoTerminadoDAO,CorteCajaDAO,CorteCajaVentaDAO,RetiroDAO,MateriaPrimaDAO,ProveedorDAO
 from config import DevelopmentConfig
 
 # PDF
@@ -3243,22 +3243,8 @@ class CompraView(ModelView):
 
         return redirect(return_url)
 
-#### Añadir views to admin --------------------------------------------------------------------------------------
-# admin.add_view(UserView(User,db.session,menu_icon_type='fa', menu_icon_value='fa-user',name="Usuarios"))
-# admin.add_view(RolView(Rol,db.session,category='Adm. Permisos ',name="Rol"))
-# admin.add_view(PermisoView(Permiso,db.session,category='Adm. Permisos ',name="Permiso"))
-# admin.add_view(PermisoRolView(PermisoRol,db.session,category='Adm. Permisos ',name="Permisos-Roles"))
-# admin.add_view(ProveedorView(Proveedor,db.session,menu_icon_type='fa', menu_icon_value='fa-id-card-o',name="Proveedor"))
-# admin.add_view(MateriaPrimaView(MateriaPrima,db.session,menu_icon_type='fa', menu_icon_value='fa-shopping-basket ',name="Materia Prima"))
 
-# admin.add_view(RecetaView(Receta, db.session,menu_icon_type='fa', menu_icon_value='fa-spoon',name="Recetas"))
-# admin.add_view(SolicitudProduccionView(SolicitudProduccion, db.session, menu_icon_type='fa', menu_icon_value='fa-plus',name="Solicitud Producción"))
-# admin.add_view(InventarioProductoTerminadoView(InventarioProductoTerminado, db.session,menu_icon_type='fa', menu_icon_value='fa-calculator',name="Inventario en venta"))
-# admin.add_view(GalletaView(Galleta, db.session,menu_icon_type='fa', menu_icon_value='fa-cutlery',name="Galletas"))
-# admin.add_view(MermaProdTerminadoView(MermaProdTerminado, db.session, menu_icon_type='fa', menu_icon_value='fa-plus-square-o',name="Merma Galletas"))
-# admin.add_view(MermaProduccionView(MermaProduccion, db.session, name="Merma Materias"))
 
-# Define tus blueprints
 admin_blueprints = [
     UserView(User, db.session, menu_icon_type='fa', menu_icon_value='fa-user', name="Usuarios"),
     RolView(Rol, db.session, category='Adm. Permisos ', name="Rol"),
@@ -3619,22 +3605,31 @@ def finalizarCorte():
         hora_termino = datetime.now().time()
         VentaDelDía = 0
         monto_retiro_total = 0
+        monto_retiro_total_pago = 0
         
         try:
-            # CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
+            CorteCajaDAO.finalizar_corte(id_corte_caja, fecha_de_termino, hora_termino)
             cortes = CorteCajaVentaDAO.consultar_para_generar_corte(id_corte_caja)
             for corte in cortes:
                 total = VentaDAO.obtener_total_por_id_venta(int(corte['id_venta']))
                 corte['total_venta'] = total
                 VentaDelDía += total
             
-            retiros = RetiroDAO.consultar_por_id_corte_caja(id_corte_caja)
+            retiros = RetiroDAO.consultar_retiros_recolecta_por_id_corte_caja(id_corte_caja)
             for retiro in retiros:
                 monto_retiro_total += retiro['monto']
+            print(monto_retiro_total)
+            print(retiros)
 
-            pdf_base64 = generar_pdf_corte(cortes, VentaDelDía, retiros, monto_retiro_total)
+            retiros_pago = RetiroDAO.consultar_retiros_no_recolecta_por_id_corte_caja(id_corte_caja)
+            for retiro in retiros_pago:
+                monto_retiro_total_pago += retiro['monto']
+            print(monto_retiro_total_pago)
+            print(retiros_pago)
+
+            pdf_base64 = generar_pdf_corte(cortes, VentaDelDía, retiros, monto_retiro_total, retiros_pago, monto_retiro_total_pago)
             # print(pdf_base64)
-            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total, pdf_base64=pdf_base64)
+            return render_template('ventas/corteCaja.html', cortes=cortes, VentaDelDía=VentaDelDía, retiros=retiros, monto_retiro_total=monto_retiro_total, pdf_base64=pdf_base64, retiros_pago=retiros_pago, monto_retiro_total_pago=monto_retiro_total_pago)
         
         except Exception as ex:
             print("Error al finalizar el corte de caja:", ex)
@@ -3642,59 +3637,83 @@ def finalizarCorte():
     return render_template('ventas/corteCaja.html')
 
 
+class VentasPagoView(BaseView):
+    @expose('/', methods=['GET', 'POST'])
+    def index(self):
+        galletas = GalletaDAO.get_costo_galletas()
+        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        proveedores = ProveedorDAO.consultar_id_nombre_proveedores()
+        
+        if request.method == "POST":
+            proveedor = request.form.get('proveedor')
+            monto = request.form.get('cantidadRetiro')
+            id_usuario = request.form.get('id_usuario')
+            fecha_hora = datetime.now()
+            motivo = 'pago a ' + proveedor
+            insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']), motivo)
+        
+        efectivo_disponible = verificar_efectivo_disponible(int(corte_caja['id_corte_caja']))
+        necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
+
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte, efectivo_disponible=efectivo_disponible, proveedores=proveedores)
+admin.add_view(VentasPagoView(name='VentasRecolecta', endpoint='ventas_pago'))
+
 class VentasRecolectaView(BaseView):
     @expose('/', methods=['GET', 'POST'])
     def index(self):
         galletas = GalletaDAO.get_costo_galletas()
         corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        proveedores = ProveedorDAO.consultar_id_nombre_proveedores()
         
         if request.method == "POST":
             id_usuario = request.form.get('numero_empleado')
             monto = request.form.get('monto_retirar')
             fecha_hora = datetime.now()
-            insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']))
+            insertar_retiro(id_usuario, monto, fecha_hora, int(corte_caja['id_corte_caja']), 'recolecta')
         
+        efectivo_disponible = verificar_efectivo_disponible(int(corte_caja['id_corte_caja']))
         necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
 
-        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte, efectivo_disponible=efectivo_disponible, proveedores=proveedores)
 admin.add_view(VentasRecolectaView(name='VentasRecolecta', endpoint='ventas_recolecta'))
 
+class VentasDiariasView(BaseView):
+    @expose('/', methods=['GET', 'POST'])
+    def ventasCorte(self):
+        galletas = GalletaDAO.get_costo_galletas()
+        proveedores = ProveedorDAO.consultar_id_nombre_proveedores()
+        
+        if request.method == "POST":
+            id_usuario = request.form.get('numero_empleado')
+            fecha_de_inicio = datetime.now().date()
+            hora_inicio = datetime.now().time()
+            fecha_de_termino = None
+            hora_termino = None
+            estatus = 0
+            id_corte_caja = CorteCajaDAO.insertar_corte_caja(
+                fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario
+            )
+            corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
 
-@app.route('/ventas_diarias', methods=["GET", "POST"])
-def ventasCorte():
-    galletas = GalletaDAO.get_costo_galletas()
-    
-    if request.method == "POST":
-        id_usuario = request.form.get('numero_empleado')
-        fecha_de_inicio = datetime.now().date()
-        hora_inicio = datetime.now().time()
-        fecha_de_termino = None
-        hora_termino = None
-        estatus = 0
+        else:
+            corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()        
+        
+        efectivo_disponible = verificar_efectivo_disponible(int(corte_caja['id_corte_caja']))
+        necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
 
-        id_corte_caja = CorteCajaDAO.insertar_corte_caja(
-            fecha_de_inicio, hora_inicio, fecha_de_termino, hora_termino, estatus, id_usuario
-        )
-        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
-
-    else:
-        corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()        
-    
-    necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
-
-    return render_template('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte)
-
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja, necesita_corte=necesita_corte, efectivo_disponible=efectivo_disponible, proveedores=proveedores)
+admin.add_view(VentasDiariasView(name='VentasDiarias', endpoint='ventas_diarias'))
 
 class VenderView(BaseView):
     
     @expose('/', methods=['GET', 'POST'])
     def index(self):
         galletas = GalletaDAO.get_costo_galletas()
-        # print(galletas)
         corte_caja = CorteCajaDAO.consultar_primer_registro_descendente()
+        efectivo_disponible = verificar_efectivo_disponible(int(corte_caja['id_corte_caja']))
         necesita_corte = verificar_corte(int(corte_caja['id_corte_caja']))
-        # print(necesita_corte)
-        
+        proveedores = ProveedorDAO.consultar_id_nombre_proveedores()
+
         if request.method == "POST":
             datos_orden = request.json.get('orden_venta')
 
@@ -3723,18 +3742,37 @@ class VenderView(BaseView):
                 }
                 return jsonify(resultado_venta)
 
-        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte)
+        return self.render('ventas/ventas.html', galletas=galletas, corte_caja = corte_caja,necesita_corte=necesita_corte, efectivo_disponible = efectivo_disponible, proveedores=proveedores)
         
 admin.add_view(VenderView(name='Ventas', endpoint='ventas_admin', menu_icon_type="fa", menu_icon_value="fa-dollar-sign"))
 # -------------- INSERTAR RETIRO --------------
-def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja):
+def insertar_retiro(id_usuario, monto, fecha_hora, id_corte_caja, motivo):
     try:
-        RetiroDAO.insertar_retiro(fecha_hora, monto, 'recolecta',id_corte_caja,id_usuario)
-        CorteCajaVentaDAO.actualizar_estatus(id_corte_caja)
+        RetiroDAO.insertar_retiro(fecha_hora, monto, motivo,id_corte_caja,id_usuario)
+        if motivo == "recolecta":
+            CorteCajaVentaDAO.actualizar_estatus(id_corte_caja)
         return 
     except Exception as ex:
         raise Exception(ex)
 # -------------- INSERTAR RETIRO --------------
+
+# -------------- EFECTIVO DISPONIBLE --------------
+def verificar_efectivo_disponible(id_corte_caja):
+    try:
+        cortes = CorteCajaVentaDAO.consultar_por_id_corte_caja(id_corte_caja)
+        total_ventas = 0 
+
+        for corte in cortes:
+            id_venta = corte['id_venta']
+            total_venta = VentaDAO.obtener_total_por_id_venta(id_venta)
+            total_ventas += total_venta 
+
+        total_ventas = round(total_ventas, 2)
+
+        return total_ventas
+    except Exception as ex:
+        raise Exception(ex)
+# -------------- EFECTIVO DISPONIBLE --------------
 
 # -------------- REQUIERE CORTE --------------
 def verificar_corte(id_corte_caja):
@@ -3749,7 +3787,7 @@ def verificar_corte(id_corte_caja):
 
         total_ventas = round(total_ventas, 2)
 
-        recolecta = total_ventas > 500
+        recolecta = total_ventas > 1000
         resultado = {'dinero_en_caja': total_ventas, 'recolecta': recolecta}
 
         return resultado
@@ -3848,7 +3886,7 @@ def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
     
     pdf_path = os.path.join(folder_path, pdf_filename)
     
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30, title="ticket")
     elements = []
 
     logo_path = os.path.join(os.getcwd(), 'static', 'img', 'logo.png')
@@ -3905,7 +3943,7 @@ def generar_pdf_ventas(orden_venta, fecha_venta, id_venta):
 # -------------- GENERACIÓN DEL PDF DE VENTAS --------------
 
 # -------------- GENERACIÓN DEL PDF DE CORTES --------------
-def generar_pdf_corte(cortes, venta_del_dia, retiros, monto_retiro_total):
+def generar_pdf_corte(cortes, venta_del_dia, retiros, monto_retiro_total, retiros_pago, monto_retiro_total_pago):
     now = datetime.now()
     pdf_filename = f"corte_caja_{now.strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
     
@@ -3915,17 +3953,20 @@ def generar_pdf_corte(cortes, venta_del_dia, retiros, monto_retiro_total):
     
     pdf_path = os.path.join(folder_path, pdf_filename)
     
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30, title="Corte Caja")
     elements = []
 
+    logo_path = os.path.join(os.getcwd(), 'static', 'img', 'logo.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=60, height=60)  
+        logo.hAlign = 'LEFT'
+        elements.append(logo)
+    
+    fecha_hora_formato = now.strftime('%d/%m/%Y    hora: %H:%M:%S')
     style = getSampleStyleSheet()['Title']
-    elements.append(Paragraph("Cortes de Caja Totales", style))
+    elements.append(Paragraph(f"Corte de Caja ( Fecha: {fecha_hora_formato} )", style))
     elements.append(Spacer(1, 20))
-
-    elements.append(Paragraph(f"Venta del día: ${venta_del_dia:.2f}", style))
-    elements.append(Spacer(1, 10))
-
-    # Tabla de cortes de caja
+    
     data_cortes = [["ID Corte Caja Venta", "ID Venta", "ID Corte Caja", "Total Venta"]]
     for corte in cortes:
         data_cortes.append([
@@ -3944,34 +3985,64 @@ def generar_pdf_corte(cortes, venta_del_dia, retiros, monto_retiro_total):
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
+    elements.append(Paragraph("Tabla de Cortes de Caja", style))
     elements.append(table_cortes)
+    elements.append(Paragraph(f"Venta del día: ${venta_del_dia:.2f}", style))
     elements.append(Spacer(1, 20))
-
-    # Tabla de retiros
-    data_retiros = [["ID Retiro", "Fecha y Hora", "Monto", "Motivo", "ID Corte Caja", "ID Usuario"]]
-    for retiro in retiros:
-        data_retiros.append([
-            retiro['id_retiro'],
-            retiro['fecha_hora'],
-            round(retiro['monto'], 2),
-            retiro['motivo'],
-            retiro['id_corte_caja'],
-            retiro['id_usuario']
-        ])
-    table_retiros = Table(data_retiros)
-    table_retiros.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(table_retiros)
-    elements.append(Spacer(1, 20))
-
-    elements.append(Paragraph(f"Monto Total de Retiros: ${monto_retiro_total:.2f}", style))
+    
+    if retiros:
+        data_retiros = [["ID Retiro", "Fecha y Hora", "Monto", "Motivo", "ID Corte Caja", "ID Usuario"]]
+        for retiro in retiros:
+            data_retiros.append([
+                retiro['id_retiro'],
+                retiro['fecha_hora'],
+                round(retiro['monto'], 2),
+                retiro['motivo'],
+                retiro['id_corte_caja'],
+                retiro['id_usuario']
+            ])
+        table_retiros = Table(data_retiros)
+        table_retiros.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(Paragraph("Tabla de Retiros", style))
+        elements.append(table_retiros)
+        if monto_retiro_total:
+            elements.append(Paragraph(f"Monto Total de Retiros: ${monto_retiro_total:.2f}", style))
+        elements.append(Spacer(1, 20))
+    
+    if retiros_pago:
+        data_retiros_pago = [["ID Retiro", "Fecha y Hora", "Monto", "Motivo", "ID Corte Caja", "ID Usuario"]]
+        for retiro in retiros_pago:
+            data_retiros_pago.append([
+                retiro['id_retiro'],
+                retiro['fecha_hora'],
+                round(retiro['monto'], 2),
+                retiro['motivo'],
+                retiro['id_corte_caja'],
+                retiro['id_usuario']
+            ])
+        table_retiros_pago = Table(data_retiros_pago)
+        table_retiros_pago.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(Paragraph("Tabla de Retiros por Pago", style))
+        elements.append(table_retiros_pago)
+        if monto_retiro_total_pago:
+            elements.append(Paragraph(f"Monto Total de Retiros por Pago: ${monto_retiro_total_pago:.2f}", style))
+        elements.append(Spacer(1, 20))
 
     doc.build(elements)
 

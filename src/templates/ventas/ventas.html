@@ -24,6 +24,46 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="button" class="btn btn-primary" id="btn_finalizar_corte" onclick="confirmarFinalizarCorte()">Finalizar Corte de caja</button>
         </form>
+        
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#retiroProveedorModal">
+            Pago a proveedor
+        </button>        
+        <div class="modal fade" id="retiroProveedorModal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-labelledby="retiroProveedorModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title" id="retiroProveedorModalLabel">Retiro pago a proveedor</h5>
+                </div>
+                <form action="/admin/ventas_pago" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="proveedor" class="form-label">Selecciona un proveedor</label>
+                            <select class="form-select" id="proveedor" name="proveedor" required>
+                                <option selected disabled>Selecciona un proveedor</option>
+                                {% for proveedor in proveedores %}
+                                <option value="{{ proveedor.nombre }}">{{ proveedor.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                          <label for="cantidadRetiro" class="form-label">Cantidad a retirar</label>
+                          <input type="number" class="form-control" id="cantidadRetiro" name="cantidadRetiro" required onblur="validarCantidadRetiro('{{efectivo_disponible }}')" oninput="validarCantidadRetiro('{{efectivo_disponible }}')">
+                        </div>
+                        <div id="monto_error_proveedor" style="color: red;"></div>
+                        <div class="mb-3">
+                            <label for="numeroEmpleado" class="form-label">Usuario quien realiza el retiro: {{ current_user.nombre_completo}} </label>
+                        </div>
+                        <input type="hidden" name="id_usuario" value="{{ current_user.id_usuario }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary" id="botón_pago_proveedor">Retirar</button>
+                    </div>
+                </form>
+            </div>
+            </div>
+        </div>
     </div>
     <div class="container row">
         <div class="col-sm-6 col-lg-8">
@@ -56,9 +96,6 @@
                                             <div class="modal-content">
                                                 <div class="modal-header">
                                                     <h5 class="modal-title" id="staticBackdropLabel">{{ galleta.nombre }} disponibles: {{ galleta.disponible }}</h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="row">
@@ -135,19 +172,13 @@
 {% else %}
 <div class="corte_de_caja">
     <div class="container row">
-        <form action="/ventas_diarias" method="POST">
+        <form action="/admin/ventas_diarias" method="POST">
             <div class="mb-3">
-                <label for="numero_empleado" class="form-label">Bienvenido al módulo de ventas</label>
+                <label for="numero_empleado" class="form-label">Bienvenido al módulo de ventas {{ current_user.nombre_completo}}</label>
             </div>
-            <div class="mb-3">
-                <label for="numero_empleado" class="form-label">Ingresa tu número de empleado</label>
-                <div class="centrar_input">
-                    <input type="number" class="form-control small_input" id="numero_empleado" name="numero_empleado" required oninput="validarUsuario(this)">
-                </div>
-                <div id="error_corte" style="color: red;"></div>
-            </div>
+            <input type="hidden" name="numero_empleado" value="{{ current_user.id_usuario }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary" id="btn_corte" disabled>Iniciar corte de caja</button>
+            <button type="submit" class="btn btn-primary" id="btn_corte">Iniciar corte de caja</button>
         </form>
     </div>
 </div>

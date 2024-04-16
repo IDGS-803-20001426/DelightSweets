@@ -633,6 +633,31 @@ function validarMonto(dineroEnCaja) {
     btnRecolecta.disabled = false;
 }
 
+function validarCantidadRetiro(efectivoDisponible ) {
+    
+    efectivoDisponible = parseFloat(efectivoDisponible);
+
+    var cantidadRetiro = parseFloat(document.getElementById('cantidadRetiro').value);
+    var btnRecolecta = document.getElementById('botón_pago_proveedor');
+    var montoError = document.getElementById('monto_error_proveedor');
+
+    if (isNaN(cantidadRetiro)) {
+        montoError.textContent = "El monto a retirar debe ser un número válido.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    if (cantidadRetiro > efectivoDisponible) {
+        montoError.textContent = "No puedes retirar más de $" + efectivoDisponible + " pesos.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    montoError.textContent = "";
+    btnRecolecta.disabled = false;
+}
+
+
 function validarUsuario(id_usuario) {
     console.log(id_usuario.value);
     var btnRecolecta = document.getElementById('btn_corte');
