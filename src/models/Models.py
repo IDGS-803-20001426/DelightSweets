@@ -88,24 +88,6 @@ class Compra(db.Model):
     fecha_caducidad = db.Column(db.Date, nullable=False)
     nombre_proveedor = db.Column(db.String(200), nullable=False)
 
-class Galleta(db.Model):
-    __tablename__ = 'galleta'
-
-    id_galleta = db.Column(db.SmallInteger, primary_key=True, autoincrement=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    porcentaje_ganancia = db.Column(db.Float, nullable=False)
-    imagen = db.Column(db.Text)
-    gramaje = db.Column(db.Integer)
-    inventarios = relationship('InventarioProductoTerminado', backref='galleta')
-    recetas = relationship('Receta', backref='galleta')  # Elimina este backref
-
-    def __repr__(self) -> str:
-       return f'{self.nombre}'
-
-    def __init__(self, nombre, porcentaje_ganancia, imagen=None):
-        self.nombre = nombre
-        self.porcentaje_ganancia = porcentaje_ganancia
-        self.imagen = imagen
 
 class RecetaMateriaIntermedia(db.Model):
     __tablename__ = 'receta_materia_intermedia'
@@ -416,6 +398,7 @@ class Galleta(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     porcentaje_ganancia = db.Column(db.Float, nullable=False)
     imagen = db.Column(db.Text)
+    gramaje = db.Column(db.Integer)
     inventarios = relationship('InventarioProductoTerminado', backref='galleta')
     recetas = relationship('Receta', backref='galleta')  # Elimina este backref
 

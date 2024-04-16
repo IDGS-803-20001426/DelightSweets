@@ -1456,6 +1456,47 @@ class VentasView(BaseView):
                 }
                 datos_solicitudes.append(datos_solicitud)
 
+        
+        #Galleta que genera mas Merma -----------------------------------------------------------------------
+        consultaSql3 = text("""
+            SELECT 
+            g.id_galleta,
+                g.nombre AS galleta,
+                SUM(mpt.cantidad) AS total_merma,
+                ROUND( (SUM(mpt.cantidad) / (SELECT SUM(cantidad) FROM merma_prod_terminado)) * 100, 2) AS porcentaje_merma,
+                MAX(cpg.Costo_Produccion) AS Costo_Produccion,
+                ROUND(SUM(mpt.cantidad) * MAX(cpg.Costo_Produccion), 2) AS Costo_Perdido
+            FROM merma_prod_terminado AS mpt
+            JOIN inventario_producto_terminado AS ipt ON mpt.id_inventario_prod_terminado = ipt.id_inventario_prod_terminado
+            JOIN galleta AS g ON ipt.id_galleta = g.id_galleta
+            JOIN 
+                (
+                    SELECT 
+                    g.id_galleta,
+                    g.nombre AS galleta,
+                    ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
+                            ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
+                                    ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
+                        FROM galleta g
+                        JOIN receta r ON g.id_galleta = r.id_galleta
+                        JOIN receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+                        JOIN materia_prima mp ON rmi.id_materia = mp.id_materia
+                        JOIN equivalencia AS e ON e.id_receta = r.id_receta
+                        GROUP BY g.id_galleta,g.nombre
+                ) AS cpg ON cpg.id_galleta = g.id_galleta
+            GROUP BY g.id_galleta, g.nombre
+            ORDER BY total_merma DESC
+            LIMIT 1;
+        """)
+
+        # Ejecutar la consulta
+        resultadoMerma = db.session.execute(consultaSql3)
+        labels_galletaMerma = []
+        data_galletaMerma = []
+        for venta in resultadoMerma:
+            labels_galletaMerma.append(venta.galleta)
+            data_galletaMerma.append(venta.total_merma)    
+
             # Renderizar el template con los datos
             return self.render('ventas.html', 
                             labels_diarias=labels_diarias, data_diarias=data_diarias,
@@ -1463,6 +1504,7 @@ class VentasView(BaseView):
                             labels_galletaCostoProduccion=labels_galletaCostoProduccion, data_galletaCostoProduccion=data_galletaCostoProduccion,
                             labels_galletaMasVendida=labels_galletaMasVendida, data_galletaMasVendida=data_galletaMasVendida,
                             labels_galletaUtilidad=labels_galletaUtilidad, data_galletaUtilidad=data_galletaUtilidad,
+                            labels_galletaMerma=labels_galletaMerma,data_galletaMerma=data_galletaMerma,
                             solicitudes=datos_solicitudes)
 
 
