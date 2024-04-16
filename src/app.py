@@ -902,7 +902,35 @@ class RolView(ModelView):
             flash_errors(form, message='Ocurrió un error al eliminar el registro. %(error)s')
 
         return redirect(return_url)
-#Clase MateriaPrima ------------------------------------------------------------------------
+    
+    
+    
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, SelectField, DateField
+from wtforms.validators import DataRequired, InputRequired, NumberRange, ValidationError
+from datetime import datetime
+
+
+class MateriaPrimaForm(FlaskForm):
+    nombre = StringField('Nombre de la Materia Prima', validators=[DataRequired()])
+    costo = FloatField('Costo', validators=[InputRequired(message="Debe ingresar un costo válido."), NumberRange(min=0.01, message="El costo debe ser mayor que cero.")])
+    tipo_medida = SelectField('Tipo de Medida', coerce=int, validators=[DataRequired()])
+    fecha_registro = DateField('Fecha de Registro', default=datetime.today().date(), validators=[DataRequired()])
+
+    def __init__(self, *args, **kwargs):
+        super(MateriaPrimaForm, self).__init__(*args, **kwargs)
+        self.setup_choices()
+
+    def setup_choices(self):
+        tipos_medida = EquivalenciaMedida.query.all()
+        opciones_tipos_medida = [(tipo.id_equivalencia, tipo.unidad) for tipo in tipos_medida]
+        opciones_tipos_medida.insert(0, (-1, 'Elige una opción'))
+        self.tipo_medida.choices = opciones_tipos_medida
+
+    def validate_fecha_registro(self, field):
+        if field.data > datetime.today().date():
+            raise ValidationError('La fecha de registro no puede ser en el futuro.')
+
 class MateriaPrimaView(ModelView):
     create_template = 'admin/traducciones/create_general.html'
     list_template = 'admin/traducciones/list_general.html'
@@ -913,12 +941,22 @@ class MateriaPrimaView(ModelView):
         return verificarPermisoUsuario(current_user.id_usuario, permiso, db)
     can_edit = False
     can_delete = False
-    can_create = False    
+    can_create = True    
+
+    form = MateriaPrimaForm
+   
+    column_list = ('nombre', 'costo', 'tipo_medida')
+
+    def on_model_change(self, form, model, is_created):
+        model.nombre = form.nombre.data
+        model.costo = form.costo.data
+        model.tipo_medida = form.tipo_medida.data
+       
 
     @expose('/new/', methods=('GET', 'POST'))
     def create_view(self):
         """
-            Create model view
+        Create model view
         """
         return_url = get_redirect_target() or self.get_url('.index_view')
 
@@ -930,26 +968,17 @@ class MateriaPrimaView(ModelView):
             self._validate_form_instance(ruleset=self._form_create_rules, form=form)
 
         if self.validate_form(form):
-            # in versions 1.1.0 and before, this returns a boolean
-            # in later versions, this is the model itself
             model = self.create_model(form)
             if model:
                 flash(gettext('Registro guardado exitosamente.'), 'success')
                 if '_add_another' in request.form:
                     return redirect(request.url)
                 elif '_continue_editing' in request.form:
-                    # if we have a valid model, try to go to the edit view
-                    if model is not True:
-                        url = self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url)
-                    else:
-                        url = return_url
-                    return redirect(url)
+                    return redirect(self.get_url('.edit_view', id=self.get_pk_value(model), url=return_url))
                 else:
-                    # save button
                     return redirect(self.get_save_return_url(model, is_created=True))
 
-        form_opts = FormOpts(widget_args=self.form_widget_args,
-                             form_rules=self._form_create_rules)
+        form_opts = FormOpts(widget_args=self.form_widget_args, form_rules=self._form_create_rules)
 
         if self.create_modal and request.args.get('modal'):
             template = self.create_modal_template
@@ -960,6 +989,7 @@ class MateriaPrimaView(ModelView):
                            form=form,
                            form_opts=form_opts,
                            return_url=return_url)
+
     
     @expose('/edit/', methods=('GET', 'POST'))
     def edit_view(self):
