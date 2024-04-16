@@ -1396,49 +1396,18 @@ class VentasView(BaseView):
         #Galleta que genera mas Utilidad -----------------------------------------------------------------------
         consulta_sql = text("""
             SELECT 
-                d.id_galleta, 
-                g.nombre AS Nombre_Galleta,
-                ROUND(SUM(CASE 
-                        WHEN d.medida = 'gramos' THEN 
-                            d.cantidad / (e.gramaje / e.piezas)
-                        ELSE 
-                            d.cantidad
-                        END
-                    ) * MAX(cpg.Utilidad), 2) AS Utilidad_Generada
-            FROM 
-                detalle_venta AS d
-            INNER JOIN 
-                galleta AS g ON d.id_galleta = g.id_galleta
-            INNER JOIN 
-                receta AS r ON g.id_galleta = r.id_galleta
-            INNER JOIN 
-                equivalencia AS e ON r.id_receta = e.id_receta
-            INNER JOIN (
-                SELECT 
-                    g.id_galleta AS id_galleta,
-                    g.nombre AS galleta,
-                    ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
-                    ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
-                    ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
-                FROM 
-                    galleta g
-                JOIN 
-                    receta r ON g.id_galleta = r.id_galleta
-                JOIN 
-                    receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
-                JOIN 
-                    materia_prima mp ON rmi.id_materia = mp.id_materia
-                JOIN 
-                    equivalencia AS e ON e.id_receta = r.id_receta
-                GROUP BY 
-                    g.id_galleta,g.nombre
-                ) AS cpg ON g.id_galleta = cpg.id_galleta
-            GROUP BY 
-                d.id_galleta, g.nombre
-            ORDER BY 
-                Utilidad_Generada DESC
-            LIMIT 
-                10
+            g.id_galleta,
+            g.nombre AS galleta,
+            ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
+            ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
+            ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
+                FROM galleta g
+                JOIN receta r ON g.id_galleta = r.id_galleta
+                JOIN receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+                JOIN materia_prima mp ON rmi.id_materia = mp.id_materia
+                JOIN equivalencia AS e ON e.id_receta = r.id_receta
+                GROUP BY g.id_galleta,g.nombre
+                ORDER BY Utilidad
         """)
 
         # Ejecutar la consulta
@@ -1447,8 +1416,8 @@ class VentasView(BaseView):
         labels_galletaUtilidad = []
         data_galletaUtilidad = []
         for venta in resultado:
-            labels_galletaUtilidad.append(venta.Nombre_Galleta)
-            data_galletaUtilidad.append(str(venta.Utilidad_Generada))
+            labels_galletaUtilidad.append(venta.galleta)
+            data_galletaUtilidad.append(str(venta.Utilidad))
             
                     
             # Empleado encargado de generar las galletas -----------------------------------------------------------------------
