@@ -174,17 +174,11 @@
     <div class="container row">
         <form action="/admin/ventas_diarias" method="POST">
             <div class="mb-3">
-                <label for="numero_empleado" class="form-label">Bienvenido al módulo de ventas</label>
+                <label for="numero_empleado" class="form-label">Bienvenido al módulo de ventas {{ current_user.nombre_completo}}</label>
             </div>
-            <div class="mb-3">
-                <label for="numero_empleado" class="form-label">Ingresa tu número de empleado</label>
-                <div class="centrar_input">
-                    <input type="number" class="form-control small_input" id="numero_empleado" name="numero_empleado" required oninput="validarUsuario(this)">
-                </div>
-                <div id="error_corte" style="color: red;"></div>
-            </div>
+            <input type="hidden" name="numero_empleado" value="{{ current_user.id_usuario }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary" id="btn_corte" disabled>Iniciar corte de caja</button>
+            <button type="submit" class="btn btn-primary" id="btn_corte">Iniciar corte de caja</button>
         </form>
     </div>
 </div>
