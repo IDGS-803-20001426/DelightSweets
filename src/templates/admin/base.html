@@ -304,9 +304,16 @@
   {% block tail_js %}
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      var ventasRecolectaLink = document.querySelector('a[href="/admin/ventas_recolecta/"]');
-      if (ventasRecolectaLink) {
-        ventasRecolectaLink.style.display = 'none';
+      var ventasRecolectaLink1 = document.querySelector('a[href="/admin/ventas_recolecta/"]');
+      var ventasRecolectaLink2 = document.querySelector('a[href="/admin/ventas_diarias/"]');
+      var ventasRecolectaLink3 = document.querySelector('a[href="/admin/ventas_pago/"]');
+      if
+       (ventasRecolectaLink1) {
+        ventasRecolectaLink1.style.display = 'none';
+        ventasRecolectaLink2.style.display = 'none';
+        ventasRecolectaLink3.style.display = 'none';
+        
+
       }
     });
   </script>
