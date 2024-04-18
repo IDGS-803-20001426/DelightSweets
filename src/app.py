@@ -1080,10 +1080,14 @@ class MateriaPrimaView(ModelView):
 
 class SolicitudProduccionForm(FlaskForm):
     id_receta = SelectField('Receta', choices=[], validators=[DataRequired()], coerce=int)
-    fecha_solicitud = DateTimeLocalField('Fecha de Solicitud', format='%Y-%m-%dT%H:%M')
+    fecha_solicitud = DateTimeLocalField('Fecha de Solicitud', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha_solicitud.data < datetime.now():
+            flash('La fecha de solicitud no puede ser anterior a la fecha y hora actual.', 'warning')
             return False
 
         id_receta = self.id_receta.data
@@ -2378,7 +2382,7 @@ class MermaProdTerminadoForm(FlaskForm):
     select_galleta_individual = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     select_galleta_lote = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma = IntegerField('Cantidad', validators=[NumberRange(min=1)], default=1)
-    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M')
+    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     motivo = StringField("Motivo", validators=[DataRequired()])
 
     def _query_inventario(self):
@@ -2419,6 +2423,10 @@ class MermaProdTerminadoForm(FlaskForm):
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha.data < datetime.now():
+            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'warning')
             return False
 
         id_galleta = self.select_galleta_individual.data
@@ -2654,7 +2662,7 @@ class MermaProduccionForm(FlaskForm):
     select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
-    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired(message="Por favor, introduce una fecha.")])
     motivo = StringField("Motivo", validators=[DataRequired()])
 
     def _query_lote_materias(self):
@@ -2696,6 +2704,10 @@ class MermaProduccionForm(FlaskForm):
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha.data < datetime.now():
+            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'error')
             return False
 
         if self.tipo_merma_materia.data == "2":
