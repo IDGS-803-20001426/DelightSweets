@@ -1080,10 +1080,14 @@ class MateriaPrimaView(ModelView):
 
 class SolicitudProduccionForm(FlaskForm):
     id_receta = SelectField('Receta', choices=[], validators=[DataRequired()], coerce=int)
-    fecha_solicitud = DateTimeLocalField('Fecha de Solicitud', format='%Y-%m-%dT%H:%M')
+    fecha_solicitud = DateTimeLocalField('Fecha de Solicitud', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha_solicitud.data < datetime.now():
+            flash('La fecha de solicitud no puede ser anterior a la fecha y hora actual.', 'warning')
             return False
 
         id_receta = self.id_receta.data
@@ -1359,69 +1363,57 @@ class VentasView(BaseView):
             data_galletaMasVendida.append(str(venta.Cantidad_Vendida))
 
         #Costo Producción Galleta -----------------------------------------------------------------------
-        consulta_sql = text("""
+        consultaSql2 = text("""
             SELECT 
-                g.nombre AS galleta,
-                SUM(mp.costo * rmi.cantidad) / MAX(e.piezas) AS costo
-            FROM 
-                galleta g
-            JOIN 
-                receta r ON g.id_galleta = r.id_galleta
-            JOIN 
-                receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
-            JOIN 
-                materia_prima mp ON rmi.id_materia = mp.id_materia
-            JOIN 
-                equivalencia AS e ON e.id_receta = r.id_receta
-            GROUP BY 
-                g.nombre
-            ORDER BY 
-                costo DESC
+            g.nombre AS galleta,
+            ROUND(SUM((rmi.cantidad * mp.costo)/e.piezas), 2) AS costo
+                FROM galleta g
+                JOIN receta r ON g.id_galleta = r.id_galleta
+                JOIN receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
+                JOIN materia_prima mp ON rmi.id_materia = mp.id_materia
+                JOIN equivalencia AS e ON e.id_receta = r.id_receta
+                GROUP BY g.nombre
+                ORDER BY costo DESC;
         """)
 
-        consulta_costo_produccion = db.session.query(
-            Galleta.nombre.label('galleta'),
-            (func.sum(MateriaPrima.costo * RecetaMateriaIntermedia.cantidad) / func.max(Equivalencia.piezas)).label('costo')
-        ).from_statement(consulta_sql)
-
-        resultado = consulta_costo_produccion.all()
+        resultadoCostoProduccion = db.session.execute(consultaSql2)
 
         labels_galletaCostoProduccion = []
         data_galletaCostoProduccion = []
-        for venta in resultado:
+        for venta in resultadoCostoProduccion:
             labels_galletaCostoProduccion.append(venta.galleta)
             data_galletaCostoProduccion.append(str(venta.costo))
 
 
         #Galleta que genera mas Utilidad -----------------------------------------------------------------------
-        consulta_sql = text("""
+        consultaSql3 = text("""
             SELECT 
             g.id_galleta,
             g.nombre AS galleta,
-            ROUND(SUM(mp.costo * rmi.cantidad) / MAX(e.piezas), 2) AS Costo_Produccion,
-            ROUND(((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100), 2) AS Utilidad,
-            ROUND((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) + (((SUM(mp.costo * rmi.cantidad) / MAX(e.piezas)) * MAX(g.porcentaje_ganancia) / 100)), 2) AS Costo_Galleta
+            ROUND(SUM((rmi.cantidad * mp.costo)/e.piezas), 2) AS Costo_Produccion,
+            ROUND(SUM(g.porcentaje_ganancia * ((rmi.cantidad * mp.costo)/e.piezas) ) , 2) AS Utilidad,
+            ROUND(SUM(g.porcentaje_ganancia * ((rmi.cantidad * mp.costo)/e.piezas) ) + SUM((rmi.cantidad * mp.costo)/e.piezas), 2) AS Costo_Galleta
                 FROM galleta g
                 JOIN receta r ON g.id_galleta = r.id_galleta
                 JOIN receta_materia_intermedia rmi ON r.id_receta = rmi.id_receta
                 JOIN materia_prima mp ON rmi.id_materia = mp.id_materia
                 JOIN equivalencia AS e ON e.id_receta = r.id_receta
                 GROUP BY g.id_galleta,g.nombre
-                ORDER BY Utilidad
+                ORDER BY Utilidad;
         """)
 
         # Ejecutar la consulta
-        resultado = db.session.execute(consulta_sql)
+        resultadoUtilidadGalleta = db.session.execute(consultaSql3)
 
         labels_galletaUtilidad = []
         data_galletaUtilidad = []
-        for venta in resultado:
+        for venta in resultadoUtilidadGalleta:
             labels_galletaUtilidad.append(venta.galleta)
             data_galletaUtilidad.append(str(venta.Utilidad))
             
                     
             # Empleado encargado de generar las galletas -----------------------------------------------------------------------
-            consulta_sql_empleado_galleta = text("""
+            consultaSql4 = text("""
                 SELECT 
                     sp.id_solicitud AS Solicitud, 
                     u.nombre_completo AS Empleado_Reponsable, 
@@ -1440,7 +1432,7 @@ class VentasView(BaseView):
             """)
 
         
-            resultado_empleado_galleta = db.session.execute(consulta_sql_empleado_galleta)
+            resultado_empleado_galleta = db.session.execute(consultaSql4)
 
             
             datos_solicitudes = []
@@ -1457,7 +1449,7 @@ class VentasView(BaseView):
 
         
         #Galleta que genera mas Merma -----------------------------------------------------------------------
-        consultaSql3 = text("""
+        consultaSql5 = text("""
             SELECT 
             g.id_galleta,
                 g.nombre AS galleta,
@@ -1489,7 +1481,7 @@ class VentasView(BaseView):
         """)
 
         # Ejecutar la consulta
-        resultadoMerma = db.session.execute(consultaSql3)
+        resultadoMerma = db.session.execute(consultaSql5)
         labels_galletaMerma = []
         data_galletaMerma = []
         for venta in resultadoMerma:
@@ -2390,7 +2382,7 @@ class MermaProdTerminadoForm(FlaskForm):
     select_galleta_individual = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     select_galleta_lote = SelectField('Galleta', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma = IntegerField('Cantidad', validators=[NumberRange(min=1)], default=1)
-    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M')
+    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     motivo = StringField("Motivo", validators=[DataRequired()])
 
     def _query_inventario(self):
@@ -2431,6 +2423,10 @@ class MermaProdTerminadoForm(FlaskForm):
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha.data < datetime.now():
+            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'warning')
             return False
 
         id_galleta = self.select_galleta_individual.data
@@ -2666,7 +2662,7 @@ class MermaProduccionForm(FlaskForm):
     select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
-    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired(message="Por favor, introduce una fecha.")])
     motivo = StringField("Motivo", validators=[DataRequired()])
 
     def _query_lote_materias(self):
@@ -2708,6 +2704,10 @@ class MermaProduccionForm(FlaskForm):
 
     def validate(self):
         if not super().validate():
+            return False
+
+        if self.fecha.data < datetime.now():
+            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'error')
             return False
 
         if self.tipo_merma_materia.data == "2":
