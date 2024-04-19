@@ -16,7 +16,7 @@ from functools import wraps
 from markupsafe import Markup
 from permissions import permission_required
 from validaciones import validarPalabrasConsulta,validarFormulario,validarContrasenia,cargarContraseñasComunes,validarCamposLogin
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy.exc import SQLAlchemyError
 import re
 import forms
@@ -1086,8 +1086,8 @@ class SolicitudProduccionForm(FlaskForm):
         if not super().validate():
             return False
 
-        if self.fecha_solicitud.data < datetime.now():
-            flash('La fecha de solicitud no puede ser anterior a la fecha y hora actual.', 'warning')
+        if self.fecha_solicitud.data.date() < date.today():
+            flash('La fecha de solicitud no puede ser anterior a la fecha actual', 'warning')
             return False
 
         id_receta = self.id_receta.data
@@ -2425,8 +2425,8 @@ class MermaProdTerminadoForm(FlaskForm):
         if not super().validate():
             return False
 
-        if self.fecha.data < datetime.now():
-            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'warning')
+        if self.fecha.data.date()< date.today():
+            flash('La fecha de merma no puede ser anterior a la fecha actual.', 'warning')
             return False
 
         id_galleta = self.select_galleta_individual.data
@@ -2661,7 +2661,7 @@ class MermaProduccionForm(FlaskForm):
     tipo_merma_materia = RadioField('Tipo de merma', choices=[('1', 'Lote'), ('2', 'Individual')], validators=[DataRequired()], default='2', render_kw={"style": "display: inline-block; border: none; list-style: none;"})
     select_materia_individual = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
     select_materia_lote = SelectField('Materia Prima', choices=[], validators=[DataRequired()], coerce=int)
-    cantidad_merma_materia = IntegerField('Cantidad', validators=[NumberRange(min=1), DataRequired()], default=1)
+    cantidad_merma_materia = FloatField('Cantidad', validators=[NumberRange(min=0.01), DataRequired()], default=1)
     fecha = DateTimeLocalField('Fecha', format='%Y-%m-%dT%H:%M', validators=[DataRequired(message="Por favor, introduce una fecha.")])
     motivo = StringField("Motivo", validators=[DataRequired()])
 
@@ -2706,8 +2706,8 @@ class MermaProduccionForm(FlaskForm):
         if not super().validate():
             return False
 
-        if self.fecha.data < datetime.now():
-            flash('La fecha de merma no puede ser anterior a la fecha y hora actual.', 'error')
+        if self.fecha.data.date() < date.today():
+            flash('La fecha de merma no puede ser anterior a la fecha  actual.', 'error')
             return False
 
         if self.tipo_merma_materia.data == "2":
