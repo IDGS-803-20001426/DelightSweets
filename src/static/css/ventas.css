@@ -131,16 +131,23 @@ body {
 .alert-container {
   position: fixed;
   width: 100%;
-  top: 0;
-  z-index: 1000;
+  top: 0%;
+  z-index: 10000;
 }
 
-.btn_terminar_corte {
-  /* position: fixed;
-  top: 5px;
-  z-index: 999;
-  right: 5px; */
-}
+/* .col-md-6{
+  margin-left: 1px;
+  margin-right: 1px;
+} */
+/* .btnTop{
+  margin-left: auto;
+  margin-right: auto;
+} */
+
+/* .btn_terminar_corte {
+  display: flex;
+  justify-content: center;
+} */
 
 
 .centrar_input{
