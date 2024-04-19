@@ -23,7 +23,7 @@ class GalletaDAO:
                 Galleta.nombre,
                 Galleta.imagen,
                 func.ROUND(
-                    (Galleta.porcentaje_ganancia * (func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo))/Equivalencia.piezas ) + (func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo))/Equivalencia.piezas,
+                    ((Galleta.porcentaje_ganancia * func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo)) + func.SUM(RecetaMateriaIntermedia.cantidad * MateriaPrima.costo)) / Equivalencia.piezas,
                     1
                 ).label('costo_galleta'),
                 inventario_disponible_subquery.c.disponible.label('disponible'),

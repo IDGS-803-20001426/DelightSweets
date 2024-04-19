@@ -85,30 +85,16 @@ function showAlert1(type, message) {
 
 function showAlert(type, message) {
     var alertDiv = document.createElement('div');
-    alertDiv.classList.add('alert', 'alert-' + type, 'alert-dismissible', 'fade', 'show');
+    alertDiv.classList.add('alert', 'alert-' + type);
     alertDiv.setAttribute('role', 'alert');
-
-    var closeButton = document.createElement('button');
-    closeButton.classList.add('close');
-    closeButton.setAttribute('type', 'button');
-    closeButton.setAttribute('data-dismiss', 'alert');
-    closeButton.setAttribute('aria-label', 'Close');
-
-    var closeIcon = document.createElement('span');
-    closeIcon.setAttribute('aria-hidden', 'true');
-    closeIcon.innerHTML = '&times;';
-
-    var messageText = document.createTextNode(message);
-
-    closeButton.appendChild(closeIcon);
-    alertDiv.appendChild(messageText);
-    alertDiv.appendChild(closeButton);
+    alertDiv.innerText = message;
 
     var container = document.getElementById('alert-container');
     container.appendChild(alertDiv);
+
     setTimeout(function() {
         alertDiv.remove();
-    }, 2000);
+    }, 3000);
 }
 
 
@@ -128,7 +114,13 @@ function generarOrdenCompra() {
         ventasContainer.appendChild(mensaje);
 
         document.querySelector('.boton_vender').style.display = 'none';
+
+        document.getElementById('pago_proveedor').disabled = false;
+        document.getElementById('btn_finalizar_corte').disabled = false;
     } else {
+        document.getElementById('pago_proveedor').disabled = true;
+        document.getElementById('btn_finalizar_corte').disabled = true;
+
         document.querySelector('.boton_vender').style.display = 'block';
 
         ordenVenta.forEach(function(orden, index) {
@@ -449,7 +441,7 @@ function confirmarCancelar(galletaId) {
 
 function limpiarFormulario(galletaId) {
     var select = document.getElementById('medida_' + galletaId);
-    select.value = '';
+    // select.value = '';
 
     var cantidadButtonDiv = document.getElementById('cantidad_button_' + galletaId);
     cantidadButtonDiv.style.display = 'none';
@@ -512,6 +504,7 @@ function confirmarOrden(galletaId) {
 }
 
 function habilitarConfirmarOrden(galletaId, disponible, nombre, gramosPorPieza) {
+    
     console.log('id_galleta: ' + galletaId + '\n' + 'disponible: ' + disponible + '\n' + 'nombre: ' + nombre + '\n' + 'gramos_por_pieza: ' + gramosPorPieza);
 
     localStorage.removeItem('cantidad_orden');
@@ -633,31 +626,6 @@ function validarMonto(dineroEnCaja) {
     btnRecolecta.disabled = false;
 }
 
-function validarCantidadRetiro(efectivoDisponible ) {
-    
-    efectivoDisponible = parseFloat(efectivoDisponible);
-
-    var cantidadRetiro = parseFloat(document.getElementById('cantidadRetiro').value);
-    var btnRecolecta = document.getElementById('botón_pago_proveedor');
-    var montoError = document.getElementById('monto_error_proveedor');
-
-    if (isNaN(cantidadRetiro)) {
-        montoError.textContent = "El monto a retirar debe ser un número válido.";
-        btnRecolecta.disabled = true;
-        return;
-    }
-
-    if (cantidadRetiro > efectivoDisponible) {
-        montoError.textContent = "No puedes retirar más de $" + efectivoDisponible + " pesos.";
-        btnRecolecta.disabled = true;
-        return;
-    }
-
-    montoError.textContent = "";
-    btnRecolecta.disabled = false;
-}
-
-
 function validarUsuario(id_usuario) {
     console.log(id_usuario.value);
     var btnRecolecta = document.getElementById('btn_corte');
@@ -685,4 +653,51 @@ function confirmarFinalizarCorte() {
     } else {
         return false;
     }
+}
+
+function validarFormulario() {
+    var proveedor = document.getElementById("proveedor").value;
+    var cantidadRetiro = document.getElementById("cantidadRetiro");
+
+    if (proveedor !== 'Selecciona un proveedor' && cantidadRetiro.value.trim() !== "") {
+        document.getElementById("botón_pago_proveedor").disabled = false;
+    } else {
+        document.getElementById("botón_pago_proveedor").disabled = true;
+    }
+}
+
+document.getElementById("proveedor").addEventListener("change", validarFormulario);
+document.getElementById("cantidadRetiro").addEventListener("input", validarFormulario);
+
+function validarCantidadRetiro(efectivoDisponible ) {
+    
+    efectivoDisponible = parseFloat(efectivoDisponible);
+    var proveedor = document.getElementById("proveedor").value;
+    var cantidadRetiro = parseFloat(document.getElementById('cantidadRetiro').value);
+    var btnRecolecta = document.getElementById('botón_pago_proveedor');
+    var montoError = document.getElementById('monto_error_proveedor');
+    // var montoError2 = document.getElementById('monto_error_proveedor_2');
+
+    // console.log('ESTE ES EL PROVEEDOR', proveedor);
+    // if(proveedor === 'Selecciona un proveedor'){
+    //     montoError2.textContent = "Selecciona una opcion válida.";
+    //     btnRecolecta.disabled = true;
+    //     return;
+    // }
+
+    if (isNaN(cantidadRetiro)) {
+        montoError.textContent = "El monto a retirar debe ser un número válido.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    if (cantidadRetiro > efectivoDisponible) {
+        montoError.textContent = "No puedes retirar más de $" + efectivoDisponible + " pesos.";
+        btnRecolecta.disabled = true;
+        return;
+    }
+
+    montoError.textContent = "";
+    // montoError2.textContent = "";
+    btnRecolecta.disabled = false;
 }
