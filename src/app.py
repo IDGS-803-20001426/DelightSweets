@@ -303,7 +303,7 @@ class PermisoRolView(ModelView):
     form = PermisoRolCreateForm
     column_formatters = dict(
         rol=lambda v, c, m, p: m.rol.nombre,
-        modulo=lambda v, c, m, p: m.permiso.permiso
+        modulo=lambda v, c, m, p: m.permiso.permiso if m.permiso else "Sin permiso"
     )
     column_labels = {
         'rol': 'Rol',
@@ -945,7 +945,18 @@ class MateriaPrimaView(ModelView):
 
     form = MateriaPrimaForm
    
-    column_list = ('nombre', 'costo', 'tipo_medida')
+    column_list = ('nombre', 'costo', 'tipo_medida','cantidad_en_inventario')
+
+    @staticmethod
+    def cantidad_en_inventario(view, context, model, name):
+        query = text("SELECT ROUND(SUM(cantidad), 2) FROM Inventario WHERE id_materia = :id_materia")
+        result = db.session.execute(query, {"id_materia": model.id_materia})
+        cantidad = result.scalar() or 0
+        return cantidad
+
+    column_formatters = {
+        'cantidad_en_inventario': cantidad_en_inventario
+    }
 
     def on_model_change(self, form, model, is_created):
         model.nombre = form.nombre.data
@@ -1892,12 +1903,13 @@ class GalletaView(ModelView):
         costo_total = 0
         for receta in model.recetas:
             for materia_prima in receta.materias:
-                costo_total += materia_prima.costo
+                cantidad_necesaria = GalletaDAO.get_cantidad_necesaria(receta.id_receta, materia_prima.id_materia)
+                costo_total += round(materia_prima.costo * cantidad_necesaria, 2)
         
-        if model.recetas:  # Verifica si hay recetas asociadas
-            c = costo_total / model.recetas[0].equivalencias.piezas
+        if model.recetas:  
+            c =  round(costo_total / model.recetas[0].equivalencias.piezas,2)
         else:
-            c = 0  # Si no hay recetas, establece el costo por galleta como 0
+            c = 0 
         
         return c
     
@@ -1905,7 +1917,8 @@ class GalletaView(ModelView):
         costo_total_materias_primas = self.get_costo_materias_primas(context, model, name)
         porcentaje_ganancia = model.porcentaje_ganancia
         # Calcula el precio final sumando el costo total de las materias primas y el porcentaje de ganancia
-        precio_final = costo_total_materias_primas * (1 + porcentaje_ganancia / 100)
+        
+        precio_final = (costo_total_materias_primas*porcentaje_ganancia)+(costo_total_materias_primas)
 
         if (precio_final - int(precio_final)) < 0.5 and precio_final > 0:
             precio_final = int(precio_final) + 0.5
