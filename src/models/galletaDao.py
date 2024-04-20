@@ -48,7 +48,13 @@ class GalletaDAO:
         except Exception as ex:
             raise Exception(ex)
         
-        
+    def get_cantidad_necesaria(id_receta, id_materia):
+        try:
+            cantidad_necesaria = RecetaMateriaIntermedia.query.filter_by(id_receta=id_receta, id_materia=id_materia).first().cantidad
+            return cantidad_necesaria
+        except Exception as ex:
+            raise Exception(ex)
+    
 class InventarioProductoTerminadoDAO:
     
     @classmethod
